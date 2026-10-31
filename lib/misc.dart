@@ -13,13 +13,15 @@ class MorePage extends StatelessWidget {
             color: Colors.white,
             border: Border.all(color: kLine),
             borderRadius: BorderRadius.circular(12)),
-        child: ListTile(
+        child: Material(
+            color: Colors.transparent,
+            child: ListTile(
             leading: Icon(icon, color: kNavy),
             title: Text(label,
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             trailing: const Icon(Icons.chevron_right, color: kSoft),
             onTap: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => page))));
+                .push(MaterialPageRoute(builder: (_) => page)))));
     return Column(children: [
       brandHeader(),
       Expanded(

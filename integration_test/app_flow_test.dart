@@ -18,8 +18,13 @@ void main() {
     // Open New Bill from the Home card.
     await tester.tap(find.text('New Bill').first);
     await tester.pumpAndSettle();
+    expect(find.text('Order Type'), findsOneWidget);
 
-    // Fill the first line item: name + rate (SALE kind by default).
+    // The item fields are below the fold in the form's ListView: scroll
+    // them into view first (offscreen children are not built).
+    await tester.scrollUntilVisible(find.text('Item name'), 120,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
     final itemField = find.ancestor(
         of: find.text('Item name'), matching: find.byType(TextFormField));
     expect(itemField, findsWidgets);

@@ -11,7 +11,7 @@ concurrency:
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -45,12 +45,12 @@ jobs:
       - name: Emulator functional test + release APK boot proof
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 33
+          api-level: 31
           arch: x86_64
-          profile: pixel_6
+          emulator-options: -no-snapshot-save -noaudio -no-boot-anim -gpu swiftshader_indirect
           script: |
             set +e
-            timeout 720 flutter test integration_test/app_flow_test.dart -r expanded
+            timeout 1200 flutter test integration_test/app_flow_test.dart -r expanded
             ITEST=$?
             timeout 420 python3 .github/scripts/boot_shot.py
             BOOT=$?

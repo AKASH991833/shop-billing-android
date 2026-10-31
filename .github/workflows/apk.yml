@@ -14,7 +14,9 @@ jobs:
           channel: stable
           cache: true
       - name: Generate Android scaffolding
-        run: flutter create . --platforms android --project-name shop_billing
+        run: |
+          flutter create . --platforms android --project-name shop_billing
+          rm -f test/widget_test.dart
       - name: Apply brand config
         env:
           BRAND_JSON: ${{ secrets.BRAND_JSON }}

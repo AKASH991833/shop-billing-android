@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 /// outstanding deposit and deposit held are always three separate numbers.
 class AppDb {
   static Database? _db;
+  static Future<Database>? _opening;
 
   /// Test helper: close and drop the cached connection so the next [open]
   /// reopens the database file (simulates an app restart).
@@ -16,7 +17,18 @@ class AppDb {
   }
 
   static Future<Database> open() async {
-    if (_db != null) return _db!;
+    if (_db != null && _db!.isOpen) return _db!;
+    if (_opening != null) return _opening!;
+    _opening = _openInner();
+    try {
+      _db = await _opening!;
+    } finally {
+      _opening = null;
+    }
+    return _db!;
+  }
+
+  static Future<Database> _openInner() async {
     final dir = await getDatabasesPath();
     _db = await openDatabase(p.join(dir, 'shop.db'), version: 1,
         onCreate: (db, v) async {

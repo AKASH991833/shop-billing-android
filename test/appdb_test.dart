@@ -41,9 +41,9 @@ void main() {
     expect(b['total_to_pay'], 6500.0);
 
     // Overpaying charges is rejected.
-    expect(AppDb.addPayment(id, 3001, 'Cash'), throwsArgumentError);
+    await expectLater(AppDb.addPayment(id, 3001, 'Cash'), throwsArgumentError);
     // Depositing more than agreed at billing is rejected.
-    expect(
+    await expectLater(
         AppDb.addBill(
             customerName: '',
             type: 'SALE',
@@ -56,7 +56,7 @@ void main() {
         throwsArgumentError);
 
     // Collect the outstanding deposit later, capped.
-    expect(AppDb.addPayment(id, 3001, 'UPI', purpose: 'DEPOSIT'),
+    await expectLater(AppDb.addPayment(id, 3001, 'UPI', purpose: 'DEPOSIT'),
         throwsArgumentError);
     await AppDb.addPayment(id, 3000, 'UPI', purpose: 'DEPOSIT');
     b = await bill(id);
@@ -64,7 +64,7 @@ void main() {
     expect(b['deposit_outstanding'], 0.0);
     expect(b['deposit_held'], 5000.0);
     // Any further deposit payment is rejected.
-    expect(AppDb.addPayment(id, 1, 'Cash', purpose: 'DEPOSIT'),
+    await expectLater(AppDb.addPayment(id, 1, 'Cash', purpose: 'DEPOSIT'),
         throwsArgumentError);
 
     // Paying the charge balance exactly is fine.
@@ -83,7 +83,7 @@ void main() {
     b = await bill(id);
     expect(b['deposit_held'], 0.0);
     // A second refund is rejected.
-    expect(AppDb.recordDepositRefund(id, 1), throwsArgumentError);
+    await expectLater(AppDb.recordDepositRefund(id, 1), throwsArgumentError);
 
     // Persistence across an app restart (close and reopen the DB file).
     await AppDb.debugClose();
@@ -116,7 +116,7 @@ void main() {
     var b = await bill(id);
     expect(b['deposit_held'], 600.0);
     // refund + deduction above the held amount is rejected
-    expect(AppDb.recordDepositRefund(id, 500, deduction: 200),
+    await expectLater(AppDb.recordDepositRefund(id, 500, deduction: 200),
         throwsArgumentError);
     await AppDb.recordDepositRefund(id, 600);
     b = await bill(id);

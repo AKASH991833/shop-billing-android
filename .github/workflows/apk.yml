@@ -37,23 +37,24 @@ jobs:
       - name: Data-layer tests (deposits, payments, returns, restart persistence)
         run: flutter test
       - run: flutter build apk --release
-      - name: Boot the APK in an emulator and screenshot Home
+      - name: Emulator functional test + release APK boot proof
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
           arch: x86_64
           profile: pixel_6
           script: |
-            adb install -r build/app/outputs/flutter-apk/app-release.apk
-            adb shell monkey -p com.example.shop_billing -c android.intent.category.LAUNCHER 1
-            sleep 12
-            adb shell screencap -p /sdcard/boot_home.png
-            adb pull /sdcard/boot_home.png boot_home.png
+            flutter test integration_test/app_flow_test.dart
+            python3 .github/scripts/boot_shot.py
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: boot-screenshot
-          path: boot_home.png
+          path: |
+            boot_home.png
+            logcat_tail.txt

@@ -1,0 +1,23 @@
+name: shop_billing
+description: Shop billing and rental manager.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.0
+  path: ^1.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  sqflite_common_ffi: ^2.3.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand.json

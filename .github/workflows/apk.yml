@@ -1,0 +1,57 @@
+name: Build Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android scaffolding
+        run: flutter create . --platforms android --project-name shop_billing
+      - name: Apply brand config
+        env:
+          BRAND_JSON: ${{ secrets.BRAND_JSON }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          s = os.environ.get("BRAND_JSON", "").strip()
+          if s:
+              open("assets/brand.json", "w").write(s)
+              name = json.loads(s).get("shop_name", "").strip()
+              if name:
+                  m = "android/app/src/main/AndroidManifest.xml"
+                  x = open(m).read()
+                  x = re.sub(r'android:label="[^"]*"', 'android:label="%s"' % name, x)
+                  open(m, "w").write(x)
+          PY
+      - run: flutter pub get
+      - name: Data-layer tests (deposits, payments, returns, restart persistence)
+        run: flutter test
+      - run: flutter build apk --release
+      - name: Boot the APK in an emulator and screenshot Home
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb install -r build/app/outputs/flutter-apk/app-release.apk
+            adb shell monkey -p com.example.shop_billing -c android.intent.category.LAUNCHER 1
+            sleep 12
+            adb shell screencap -p /sdcard/boot_home.png
+            adb pull /sdcard/boot_home.png boot_home.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boot-screenshot
+          path: boot_home.png

@@ -9,7 +9,7 @@ for _ in range(60):
         break
     time.sleep(3)
 time.sleep(10)
-print(sh('install', '-r', 'build/app/outputs/flutter-apk/app-release.apk'))
+print(sh('install', '-r', 'build/app/outputs/flutter-apk/app-x86_64-release.apk'))
 sh('shell', 'monkey', '-p', 'com.example.shop_billing',
    '-c', 'android.intent.category.LAUNCHER', '1')
 

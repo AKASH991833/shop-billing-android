@@ -5,8 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:shop_billing/invoice_pdf.dart';
 
-Future<pw.Font> ttf(String path) async => pw.Font.ttf(
-    ByteData.sublistView(await File('assets/fonts/$path').readAsBytes()));
+Future<ByteData> _bytes(String path) async =>
+    ByteData.sublistView(await File('assets/fonts/$path').readAsBytes());
+
+Future<PdfFontBundle> testFonts() async {
+  final reg = await _bytes('NotoSans-Regular.ttf');
+  final dev = await _bytes('NotoSansDevanagari-Regular.ttf');
+  return PdfFontBundle(
+      regular: pw.Font.ttf(reg),
+      bold: pw.Font.ttf(await _bytes('NotoSans-Bold.ttf')),
+      italic: pw.Font.ttf(await _bytes('NotoSans-Italic.ttf')),
+      fallback: [pw.Font.ttf(dev)],
+      coverage: {...ttfCoverage(reg), ...ttfCoverage(dev)});
+}
 
 void main() {
   test('inrPdf formats Indian grouping without the rupee glyph', () {
@@ -17,10 +28,7 @@ void main() {
 
   test('invoice PDF renders a real A4 document with reconcilable totals', () async {
     final bytes = await buildInvoicePdf(
-      fontRegular: await ttf('NotoSans-Regular.ttf'),
-      fontBold: await ttf('NotoSans-Bold.ttf'),
-      fontItalic: await ttf('NotoSans-Italic.ttf'),
-      fontFallback: [await ttf('NotoSansDevanagari-Regular.ttf')],
+      fonts: await testFonts(),
       shopName: 'Test Silk House',
       categories: 'SAREES - LEHENGAS - SUITS',
       motto: 'Drape your moments',
@@ -57,15 +65,14 @@ void main() {
   });
 
   test('Hindi names and items render with the bundled Devanagari font', () async {
+    // Short-i matras (दिलीप) and real conjuncts (कृष्णा, श्री) - the cases
+    // that actually exercise Devanagari shaping, not only long-i.
     final bytes = await buildInvoicePdf(
-      fontRegular: await ttf('NotoSans-Regular.ttf'),
-      fontBold: await ttf('NotoSans-Bold.ttf'),
-      fontItalic: await ttf('NotoSans-Italic.ttf'),
-      fontFallback: [await ttf('NotoSansDevanagari-Regular.ttf')],
+      fonts: await testFonts(),
       shopName: 'Test Silk House',
       bill: const {
         'bill_no': 'T-1002',
-        'customer': 'मीरा शर्मा',
+        'customer': 'दिलीप कृष्णा',
         'mobile': '9812345678',
         'bill_date': '2026-11-01',
         'type': 'WEDDING',
@@ -78,7 +85,7 @@ void main() {
         'deposit_outstanding': 0.0,
       },
       items: const [
-        {'description': 'बनारसी साड़ी', 'kind': 'RENTAL', 'qty': 1, 'days': 3, 'rate': 1500, 'amount': 4500.0},
+        {'description': 'श्री बनारसी साड़ी', 'kind': 'RENTAL', 'qty': 1, 'days': 3, 'rate': 1500, 'amount': 4500.0},
       ],
     );
     expect(String.fromCharCodes(bytes.take(4)), '%PDF');
@@ -93,6 +100,19 @@ void main() {
               bill: const {'bill_no': 'T-1', 'customer': 'मीरा', 'bill_date': '2026-11-01', 'type': 'SALE'},
               items: const [
                 {'description': 'साड़ी', 'kind': 'SALE', 'qty': 1, 'rate': 100, 'amount': 100.0}
+              ],
+            ),
+        throwsArgumentError);
+  });
+
+  test('scripts the bundled fonts do not cover are refused even WITH fonts (no tofu)', () async {
+    // Bengali is NOT in the bundled Noto Sans + Devanagari coverage.
+    expect(
+        () => buildInvoicePdf(
+              fonts: await testFonts(),
+              bill: const {'bill_no': 'T-2', 'customer': 'অভিষেক', 'bill_date': '2026-11-01', 'type': 'SALE'},
+              items: const [
+                {'description': 'শাড়ি', 'kind': 'SALE', 'qty': 1, 'rate': 100, 'amount': 100.0}
               ],
             ),
         throwsArgumentError);

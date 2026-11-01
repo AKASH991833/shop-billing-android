@@ -26,7 +26,7 @@ class AppDb {
   /// Schema version this build writes. A backup from a NEWER version is
   /// refused: integrity_check alone cannot tell an unrelated SQLite file (or
   /// a future schema) apart from a real backup of this app.
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
 
   static const Map<String, List<String>> _expectedColumns = {
     'customers': ['id', 'name', 'mobile', 'created_at'],
@@ -79,7 +79,7 @@ class AppDb {
 
   static Future<Database> _openInner() async {
     final dir = await getDatabasesPath();
-    _db = await openDatabase(p.join(dir, 'shop.db'), version: 1,
+    _db = await openDatabase(p.join(dir, 'shop.db'), version: 2,
         onCreate: (db, v) async {
       final b = db.batch();
       b.execute(
@@ -95,7 +95,12 @@ class AppDb {
       b.execute(
           "CREATE TABLE inventory(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '', total_qty REAL NOT NULL DEFAULT 0, sale_price REAL, rent_rate_day REAL, active INTEGER NOT NULL DEFAULT 1)");
       b.execute("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)");
+      b.execute("$LEGACY_TABLE");
       await b.commit(noResult: true);
+    }, onUpgrade: (db, oldV, newV) async {
+      if (oldV < 2) {
+        await db.execute("$LEGACY_TABLE");
+      }
     });
     return _db!;
   }
@@ -224,6 +229,57 @@ class AppDb {
     }
     if (verified) dataRevision.value++; // pages refresh automatically
     return {'verified': verified, 'safety': safety};
+  }
+
+  /// Stores records parsed from a desktop records.csv as LEGACY REFERENCE
+  /// rows - never as operational bills. The CSV's Total lumps refundable
+  /// deposit into charges and its Advance lumps deposit payments into
+  /// receipts (desktop bill_totals: grand = charges + deposit, paid = all
+  /// payments), so these figures cannot enter revenue/payment/deposit
+  /// accounting without corrupting it. Legacy rows are excluded from every
+  /// report and carry the exact original figures. Additive only: existing
+  /// data is never replaced or deleted; a bill_no that already exists is
+  /// skipped as a duplicate. One transaction: a mid-import failure rolls
+  /// everything back.
+  static Future<Map<String, int>> importLegacyRecords(
+      List<Map<String, Object?>> records) async {
+    final db = await open();
+    var added = 0, duplicates = 0;
+    await db.transaction((txn) async {
+      for (final r in records) {
+        final billNo = r['bill_no'] as String;
+        final exists = await txn
+            .query('legacy_records', where: 'bill_no=?', whereArgs: [billNo]);
+        if (exists.isNotEmpty) {
+          duplicates++;
+          continue;
+        }
+        await txn.insert('legacy_records', {
+          'bill_no': billNo,
+          'customer': r['customer'],
+          'mobile': r['mobile'],
+          'type_label': r['type_label'],
+          'bill_date': r['bill_date'],
+          'return_date': r['return_date'],
+          'total': r['total'],
+          'advance': r['advance'],
+          'balance': r['balance'],
+          'status': r['status'],
+          'imported_at': DateTime.now().toIso8601String(),
+        });
+        added++;
+      }
+    });
+    if (added > 0) dataRevision.value++;
+    return {'added': added, 'duplicates': duplicates};
+  }
+
+  /// Legacy reference rows, newest first. Reference only - reports never
+  /// read this table.
+  static Future<List<Map<String, Object?>>> legacyRecords() async {
+    final db = await open();
+    return db.query('legacy_records',
+        orderBy: 'bill_date DESC, bill_no DESC');
   }
 
   /// Shop contact details + footer motto from Settings, for printing on

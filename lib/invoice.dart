@@ -12,28 +12,38 @@ import 'invoice_pdf.dart';
 /// print sheet) built by invoice_pdf.dart with bundled Noto fonts so Hindi
 /// and other Unicode names render truthfully.
 
-Map<String, pw.Font>? _pdfFonts;
+PdfFontBundle? _pdfFontBundle;
 
-/// Bundled Noto Sans (+ Devanagari fallback) for PDF output, loaded once.
-Future<Map<String, pw.Font>> loadPdfFonts() async {
-  final cached = _pdfFonts;
+/// Bundled Noto Sans (+ Devanagari fallback) for PDF output, loaded once,
+/// with glyph coverage so unsupported scripts are refused, not tofu.
+Future<PdfFontBundle> loadPdfFontBundle() async {
+  final cached = _pdfFontBundle;
   if (cached != null) return cached;
-  final fonts = <String, pw.Font>{};
+  pw.Font? regular, bold, italic, devanagari;
+  final coverage = <int>{};
   try {
-    fonts['regular'] =
-        pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Regular.ttf'));
-    fonts['bold'] =
-        pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Bold.ttf'));
-    fonts['italic'] =
-        pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Italic.ttf'));
-    fonts['devanagari'] = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/NotoSansDevanagari-Regular.ttf'));
+    final regData = await rootBundle.load('assets/fonts/NotoSans-Regular.ttf');
+    regular = pw.Font.ttf(regData);
+    coverage.addAll(ttfCoverage(regData));
+    final boldData = await rootBundle.load('assets/fonts/NotoSans-Bold.ttf');
+    bold = pw.Font.ttf(boldData);
+    final italData = await rootBundle.load('assets/fonts/NotoSans-Italic.ttf');
+    italic = pw.Font.ttf(italData);
+    final devData =
+        await rootBundle.load('assets/fonts/NotoSansDevanagari-Regular.ttf');
+    devanagari = pw.Font.ttf(devData);
+    coverage.addAll(ttfCoverage(devData));
   } catch (_) {
-    // Font assets missing: the PDF builder will refuse non-Latin-1 text
+    // Font assets missing: the PDF builder refuses non-Latin-1 text
     // explicitly instead of emitting corrupted output.
   }
-  _pdfFonts = fonts;
-  return fonts;
+  _pdfFontBundle = PdfFontBundle(
+      regular: regular,
+      bold: bold,
+      italic: italic,
+      fallback: [if (devanagari != null) devanagari],
+      coverage: coverage);
+  return _pdfFontBundle!;
 }
 class InvoicePage extends StatelessWidget {
   final Map<String, Object?> bill;
@@ -62,7 +72,6 @@ class InvoicePage extends StatelessWidget {
             tooltip: 'Share / print PDF',
             icon: const Icon(Icons.picture_as_pdf_outlined),
             onPressed: () async {
-              final fonts = await loadPdfFonts();
               final bytes = await buildInvoicePdf(
                   bill: bill,
                   items: items,
@@ -70,12 +79,7 @@ class InvoicePage extends StatelessWidget {
                   shopName: Brand.value.shopName,
                   categories: Brand.value.categories,
                   motto: Brand.value.motto,
-                  fontRegular: fonts['regular'],
-                  fontBold: fonts['bold'],
-                  fontItalic: fonts['italic'],
-                  fontFallback: [
-                    if (fonts['devanagari'] != null) fonts['devanagari']!
-                  ]);
+                  fonts: await loadPdfFontBundle());
               await Printing.sharePdf(
                   bytes: bytes, filename: 'Invoice-${bill['bill_no']}.pdf');
             }),

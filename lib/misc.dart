@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'ui.dart';
 import 'data.dart';
+import 'records_csv.dart';
 import 'main.dart';
 
 class MorePage extends StatelessWidget {
@@ -402,6 +404,72 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _exportRecords() async {
+    try {
+      final csv = await buildRecordsCsv();
+      final dir = await AppDb.backupDir();
+      final out = File(p.join(dir.path,
+          'records-${DateTime.now().millisecondsSinceEpoch}.csv'));
+      await out.writeAsString(csv);
+      if (!mounted) return;
+      await SharePlus.instance.share(ShareParams(
+          files: [XFile(out.path)], text: 'Shop records (CSV)'));
+    } catch (e) {
+      if (mounted) toast(context, 'Export failed: $e');
+    }
+  }
+
+  Future<void> _importRecords() async {
+    try {
+      final files = await FilePicker.pickFiles(
+          type: FileType.custom, allowedExtensions: ['csv']);
+      final path = files.isEmpty ? null : files.single.path;
+      if (path == null || !mounted) return;
+      final parsed = parseRecordsCsv(await File(path).readAsString());
+      if (!mounted) return;
+      final preview = StringBuffer()
+        ..write(
+            '${parsed.records.length} records found. They are stored as LEGACY REFERENCE only - excluded from revenue, deposit and payment reports, because this CSV cannot separate refundable deposit from charges. Existing data is never replaced or deleted; bill numbers already imported are skipped as duplicates.');
+      if (parsed.issues.isNotEmpty) {
+        preview.write('\n\nIssues:\n- ${parsed.issues.take(8).join('\n- ')}');
+        if (parsed.issues.length > 8) {
+          preview.write('\n- ... and ${parsed.issues.length - 8} more');
+        }
+      }
+      if (parsed.records.isNotEmpty) {
+        preview.write('\n\nFirst records:\n');
+        preview.write(parsed.records
+            .take(3)
+            .map((r) =>
+                '${r['bill_no']} - ${r['customer']} - ${money(r['total'] as num)}')
+            .join('\n'));
+      }
+      final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+                title: const Text('Import these records?'),
+                content: SingleChildScrollView(child: Text(preview.toString())),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel')),
+                  ElevatedButton(
+                      onPressed: parsed.records.isEmpty
+                          ? null
+                          : () => Navigator.pop(ctx, true),
+                      child: const Text('Import')),
+                ],
+              ));
+      if (confirmed != true || !mounted) return;
+      final r = await AppDb.importLegacyRecords(parsed.records);
+      if (!mounted) return;
+      toast(context,
+          'Stored ${r['added']} legacy records (${r['duplicates']} duplicates skipped) - reference only, not in reports.');
+    } catch (e) {
+      if (mounted) toast(context, 'Import failed: $e');
+    }
+  }
+
   Future<void> _restore() async {
     final files = await FilePicker.pickFiles(
         type: FileType.custom, allowedExtensions: ['db']);
@@ -495,15 +563,81 @@ class _SettingsPageState extends State<SettingsPage> {
                   onPressed: _restore, child: const Text('Restore')),
             ])),
         infoRow(
-            const Text('Sync with desktop software',
+            const Text('Desktop records (CSV)',
                 style: TextStyle(fontWeight: FontWeight.w600)),
-            const Text('Not verified yet',
+            Wrap(spacing: 8, children: [
+              TextButton(onPressed: _exportRecords, child: const Text('Export')),
+              TextButton(onPressed: _importRecords, child: const Text('Import')),
+            ])),
+        infoRow(
+            const Text('Legacy records imported',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            TextButton(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const LegacyRecordsPage())),
+                child: const Text('View'))),
+        const Padding(
+            padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(
+                'Manual file transfer in the desktop Export-records format (the desktop itself cannot read files back). Imports are stored as legacy reference, excluded from reports. There is no automatic sync.',
                 style: TextStyle(fontSize: 12, color: kSoft))),
         infoRow(
             const Text('App lock',
                 style: TextStyle(fontWeight: FontWeight.w600)),
             const Text('Coming soon', style: TextStyle(fontSize: 12, color: kSoft))),
       ]),
+    );
+  }
+}
+
+
+/// Read-only viewer for imported desktop records. Reference only: these rows
+/// are NOT operational bills and are excluded from every report, because the
+/// CSV format cannot separate refundable deposit from charges.
+class LegacyRecordsPage extends StatelessWidget {
+  const LegacyRecordsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Legacy Records (reference only)')),
+      body: FutureBuilder<List<Map<String, Object?>>>(
+        future: AppDb.legacyRecords(),
+        builder: (ctx, snap) {
+          final rows = snap.data;
+          if (rows == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (rows.isEmpty) {
+            return const Center(
+                child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                        'No imported records yet. Use Settings - Desktop records (CSV) - Import.')));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: rows.length,
+            itemBuilder: (ctx, i) {
+              final r = rows[i];
+              return Card(
+                child: ListTile(
+                  title: Text(
+                      '${r['bill_no']} - ${(r['customer'] as String).isEmpty ? 'Walk-in' : r['customer']}'),
+                  subtitle: Text(
+                      '${AppDb.disp(r['bill_date'] as String?)} - ${r['type_label']}${(r['status'] as String).isNotEmpty ? ' - ${r['status']}' : ''}'),
+                  trailing: Text(
+                      'Total ${money(r['total'] as num)}\nBalance ${money(r['balance'] as num)}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontSize: 12)),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

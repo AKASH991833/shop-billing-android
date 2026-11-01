@@ -49,8 +49,10 @@ void main() {
   int billId = 0;
 
   testGoldens('all screens render with seeded shop data', (tester) async {
-    // Real-async zone: widget tests otherwise run under FakeAsync, where
-    // sqflite FFI (dart:io) futures never complete and every DB await hangs.
+    // Seed in a real-async zone (FakeAsync would hang the sqflite FFI awaits).
+    // screenMatchesGolden manages its own runAsync + pumpAndSettle per shot,
+    // which also lets each page's async DB load complete before capture - so
+    // no outer runAsync may wrap it (reentrant runAsync is denied).
     await tester.runAsync(() async {
     // Seed: two customers, two bills (one rental with deposit, one sale),
     // one inventory item - enough for every screen to show real content.
@@ -81,6 +83,7 @@ void main() {
     );
     await AppDb.addInventoryItem('Banarasi lehenga', 'Lehengas', 4, null, 1500);
     await AppDb.addInventoryItem('Cotton saree', 'Sarees', 25, 650, null);
+    });
 
     final shots = <String, Widget>{
       '01_shell_home': const Shell(),
@@ -96,17 +99,16 @@ void main() {
     };
     for (final e in shots.entries) {
       await tester.pumpWidgetBuilder(e.value, wrapper: wrap, surfaceSize: phone);
-      await settleShort(tester);
       await screenMatchesGolden(tester, e.key);
     }
 
     // Invoice needs the seeded bill + items as plain maps.
-    final bill = (await AppDb.getBill(billId))!;
-    final items = await AppDb.billItems(billId);
-    await tester.pumpWidgetBuilder(InvoicePage(bill: bill, items: items),
-        wrapper: wrap, surfaceSize: phone);
-    await settleShort(tester);
-    await screenMatchesGolden(tester, '05_invoice');
+    await tester.runAsync(() async {
+      final bill = (await AppDb.getBill(billId))!;
+      final items = await AppDb.billItems(billId);
+      await tester.pumpWidgetBuilder(InvoicePage(bill: bill, items: items),
+          wrapper: wrap, surfaceSize: phone);
     });
+    await screenMatchesGolden(tester, '05_invoice');
   });
 }

@@ -225,6 +225,11 @@ FROM bills b JOIN customers c ON c.id=b.customer_id
       'deposit_outstanding': deposit - collected,
       'deposit_held': collected - refunded - deduction,
       'total_to_pay': charges + (deposit - collected),
+      // Raw deposit fields re-emitted as doubles: SQLite IFNULL(SUM(...),0)
+      // returns INTEGER when no deposit rows exist, and callers cast to double.
+      'deposit_collected': collected,
+      'deposit_refunded': refunded,
+      'deposit_deduction': deduction,
     };
   }
 

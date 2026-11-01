@@ -163,11 +163,16 @@ class _NewBillPageState extends State<NewBillPage> {
           decoration: BoxDecoration(
               color: kNavy, borderRadius: BorderRadius.circular(14)),
           child: Column(children: [
+            // Ledger-clear preview: every line derivable, paid money never
+            // implied as still due (run-17/20 review finding).
+            //   Total incl. deposit = items + deposit collected
+            //   Receiving now       = advance + deposit collected
+            //   Balance due (items) = items - advance
             _t('Items Total', money(itemsTotal)),
             _t('Deposit collected (refundable, not revenue)', money(depositVal)),
             const Divider(color: Colors.white24),
-            _t('To Collect Now', money(itemsTotal + depositVal), strong: true),
-            _t('Advance', money(advanceVal)),
+            _t('Total incl. deposit', money(itemsTotal + depositVal), strong: true),
+            _t('Receiving now (advance + deposit)', money(advanceVal + depositVal)),
             _t('Balance Due (items)', money(balanceDue), due: true),
           ]),
         ),

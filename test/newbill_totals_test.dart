@@ -1,9 +1,13 @@
-// Audit of the New Bill live totals card (run-17 review follow-up): with
-// nonzero mixed input every figure must stay on a reconcilable basis -
-//   Items Total = sum of line amounts (rental = qty x days x rate)
-//   To Collect Now = Items Total + Deposit collected
-//   Balance Due (items) = Items Total - Advance
-// Deposit money is refundable and never counted as items revenue.
+// Audit of the New Bill live totals card against LEDGER MEANINGS (review
+// follow-up): the advance and deposit fields are money being RECEIVED at
+// save time, so no line may imply already-paid money is still due.
+//   Items Total          = sum of line amounts (rental = qty x days x rate)
+//   Total incl. deposit  = Items Total + Deposit collected  (obligation base)
+//   Receiving now        = Advance + Deposit collected      (cash at save)
+//   Balance Due (items)  = Items Total - Advance            (remaining)
+// Deposit money is refundable and never counted as items revenue. The form
+// collects the full deposit at billing (agreed == collected here);
+// partially-collected deposit ledgers are pinned in the data-layer tests.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,11 +60,15 @@ void main() {
 
     expect(find.text('₹6,500'), findsOneWidget); // Items Total
     expect(find.text('₹2,000'), findsOneWidget); // Deposit collected
-    expect(find.text('₹8,500'), findsOneWidget); // To Collect Now
-    expect(find.text('₹1,000'), findsOneWidget); // Advance
+    expect(find.text('₹8,500'), findsOneWidget); // Total incl. deposit
+    expect(find.text('₹3,000'), findsOneWidget); // Receiving now
     expect(find.text('₹5,500'), findsOneWidget); // Balance Due (items)
+    expect(find.text('Total incl. deposit'), findsOneWidget);
+    expect(find.text('Receiving now (advance + deposit)'), findsOneWidget);
     expect(find.text('Deposit collected (refundable, not revenue)'),
         findsOneWidget);
+    // The ambiguous "collect again" label must not come back.
+    expect(find.text('To Collect Now'), findsNothing);
   });
 
   testWidgets('no-deposit sale: To Collect Now equals items, balance nets advance',
@@ -74,8 +82,24 @@ void main() {
     st.setState(() {});
     await tester.pump();
 
-    expect(find.text('₹1,950'), findsWidgets); // Items Total == To Collect Now
-    expect(find.text('₹500'), findsOneWidget); // Advance
+    expect(find.text('₹1,950'), findsWidgets); // Items Total == Total incl. deposit
+    expect(find.text('₹500'), findsOneWidget); // Receiving now (advance only)
     expect(find.text('₹1,450'), findsOneWidget); // Balance Due (items)
+  });
+
+  testWidgets('fully paid bill: receiving equals total, balance is zero',
+      (tester) async {
+    final st = await pumpForm(tester);
+    final lines = st.lines as List<LineForm>;
+    lines.clear();
+    lines.add(line('SALE', '3', '1', '650')); // 1950
+    st.advance.text = '1950';
+    st.deposit.text = '0';
+    st.setState(() {});
+    await tester.pump();
+
+    expect(find.text('₹1,950'), findsWidgets); // total == receiving now
+    expect(find.text('₹0'), findsWidgets); // deposit line + balance due
+    expect(find.text('Balance Due (items)'), findsOneWidget);
   });
 }

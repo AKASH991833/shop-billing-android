@@ -31,14 +31,15 @@ void main() {
     final lines = csv.trim().split('\n');
     expect(lines.first,
         'No,Date,Customer,Mobile,Type,Total,Advance,Balance,Return/Delivery,Status');
-    // charges 2500 + deposit 1000 = total 3500; advance 700;
-    // balance = (2500-700) + (1000-1000) = 1800
+    // Desktop semantics: total = charges 2500 + deposit 1000 = 3500;
+    // advance = ALL received = 700 charge + 1000 deposit = 1700;
+    // balance = 3500 - 1700 = 1800. The row must reconcile.
     final parsed = parseRecordsCsv(csv);
     expect(parsed.issues, isEmpty, reason: csv);
     final rec =
         parsed.records.firstWhere((r) => r['customer'] == 'CSV Check');
     expect(rec['total'], 3500.0);
-    expect(rec['advance'], 700.0);
+    expect(rec['advance'], 1700.0);
     expect(rec['balance'], 1800.0);
     expect(rec['bill_date'], '2026-10-20');
     expect(rec['return_date'], '2026-10-25');
@@ -82,8 +83,8 @@ void main() {
         'X1,5 Nov 2026,"Kumar, R",,Wedding,2000,0,2000,10 Nov 2026,Open\n'
         'X2,garbage-date,Bad Row,,AlienType,10,0,10,-,Open\n'
         'X3,6 Nov 2026,Reconciles Badly,,Sale,1000,0,500,-,Open\n');
-    expect(p.records.length, 2,
-        reason: 'the bad-date row AND the balance-mismatch row are rejected');
+    expect(p.records.length, 1,
+        reason: 'only the valid row survives; bad-date and balance-mismatch rows are rejected');
     expect(p.records.first['customer'], 'Kumar, R');
     expect(p.records.first['bill_date'], '2026-11-05');
     expect(p.records.first['return_date'], '2026-11-10');

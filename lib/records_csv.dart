@@ -19,9 +19,10 @@ String csvCell(Object? v) {
 
 String _n(num v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
 
-/// Every bill as a CSV document in the desktop's exact column layout.
-/// Total = items + deposit (the desktop's "grand"); Balance = what is still
-/// outstanding on items + deposit.
+/// Every bill as a CSV document in the desktop's exact column layout and
+/// semantics (desktop bill_totals): Total = items + deposit (the desktop's
+/// "grand"); Advance = ALL money received (charge payments + deposit
+/// collected); Balance = Total - Advance. Every exported row reconciles.
 Future<String> buildRecordsCsv() async {
   final rows = await AppDb.listBills();
   final out = StringBuffer()..writeln(recordsCsvHeader.map(csvCell).join(','));
@@ -33,8 +34,9 @@ Future<String> buildRecordsCsv() async {
       r['mobile'],
       AppDb.displayType(r),
       _n((r['charges'] as num) + (r['deposit'] as num)),
-      _n(r['paid_charges'] as num),
-      _n((r['balance_charges'] as num) + (r['deposit_outstanding'] as num)),
+      _n((r['paid_charges'] as num) + (r['deposit_collected'] as num)),
+      _n(((r['charges'] as num) + (r['deposit'] as num)) -
+          ((r['paid_charges'] as num) + (r['deposit_collected'] as num))),
       AppDb.disp((r['return_date'] ?? r['event_date']) as String?),
       r['status'],
     ].map(csvCell).join(','));

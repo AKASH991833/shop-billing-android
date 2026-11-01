@@ -12,6 +12,15 @@ ITEST=$?
 # Evidence FIRST, before any later phase can hang or be cut off.
 adb logcat -d -t 400 > logcat_tail.txt
 ls -la *.png 2>/dev/null
+# Fallback: if the test session was killed before the tool pulled the
+# screenshots, recover them from on-device storage.
+adb shell ls /storage/emulated/0/Android/data/com.example.shop_billing/files/Pictures/ 2>/dev/null
+for f in 01_home 02_before_save 03_after_save 04_more 05_lock_screen 06_unlocked_home; do
+  if [ ! -f "$f.png" ]; then
+    adb pull "/storage/emulated/0/Android/data/com.example.shop_billing/files/Pictures/$f.png" "$f.png" 2>/dev/null
+  fi
+done
+ls -la *.png 2>/dev/null
 
 # OS-level lock checks on the same device (password persisted by the smoke
 # suite): cold-start gate, native-input unlock, HOME+relaunch.

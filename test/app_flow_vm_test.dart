@@ -90,8 +90,22 @@ void main() {
     // BackButton directly and asserts the Shell is actually back.
     print('CHECKPOINT: going back via AppBar BackButton tap');
     final backBtn = find.byType(BackButton);
+    // Geometry + hit-test diagnostics for the twice-reproduced tap miss
+    // (requested by reviewer): which button, where, and what the hit test
+    // actually strikes at its center.
+    print('CHECKPOINT: BackButton count=' +
+        find.byType(BackButton).evaluate().length.toString());
+    final backRect = tester.getRect(backBtn);
+    print('CHECKPOINT: BackButton rect=$backRect center=${backRect.center}');
+    final el = tester.element(backBtn);
+    final route = ModalRoute.of(el);
+    print('CHECKPOINT: enclosing route=${route?.settings.name ?? route?.runtimeType} '
+        'canPop=${route?.canPop}');
+    final hits = tester.hitTestOnBinding(backRect.center);
+    print('CHECKPOINT: hitTest at center -> ' +
+        hits.path().map((e) => e.target.runtimeType.toString()).join(' < '));
     expect(backBtn, findsOneWidget);
-    await tester.tap(backBtn, warnIfMissed: false);
+    await tester.tap(backBtn); // default warnIfMissed: keep the verbatim warning in the log
     await settle(tester);
     final shellAfterTap = find.byType(Shell).evaluate().isNotEmpty;
     print('CHECKPOINT: after back tap, shell visible=$shellAfterTap');
@@ -113,6 +127,17 @@ void main() {
         find.byType(Shell).evaluate().isNotEmpty.toString());
     expect(find.text('START WORK'), findsOneWidget);
     expect(find.textContaining('RECENT ENTRIES'), findsOneWidget);
+    // Deterministic loaded-state wait (not a blind delay): Home reloads its
+    // recent entries via the New Bill push's .then(_load) after the pop, and
+    // the FFI read needs real event-loop time - poll for the actual state
+    // with a hard bound, then assert.
+    var sawAmount = false;
+    for (var i = 0; i < 15 && !sawAmount; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+      sawAmount = find.textContaining('750').evaluate().isNotEmpty;
+    }
+    print('CHECKPOINT: home recent-entries reload after pop, 750 visible=$sawAmount');
     expect(find.textContaining('750'), findsWidgets);
     });
   });

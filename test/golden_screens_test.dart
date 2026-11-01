@@ -21,6 +21,12 @@ import 'package:shop_billing/invoice.dart';
 Widget wrap(Widget w) => MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+          // Harness-only: the test renderer's default font is Ahem (blocks)
+          // and fallback per-family is flaky (run 17's More-page tagline).
+          // Pin the default family to the loaded Roboto so every capture is
+          // deterministic. The app's real default font on-device is the
+          // platform default, which stays unverified by these renders.
+          fontFamily: 'Roboto',
           scaffoldBackgroundColor: kBg,
           colorScheme: ColorScheme.fromSeed(seedColor: kNavy, primary: kNavy),
           appBarTheme: const AppBarTheme(
@@ -131,6 +137,14 @@ void main() {
             .timeout(const Duration(seconds: 5), onTimeout: () => const []);
         print('DIAG ${e.key}: spinner=$spinner errorWidgets=$errors '
             'directListBills=${probe.length}');
+        if (e.key == '01_shell_home') {
+          // Run 17: the More-page tagline captured as block glyphs while the
+          // identical Home header rendered fine - print the exact string so
+          // the content question (exotic codepoints vs renderer fallback)
+          // is settled by evidence.
+          print('DIAG brand.tagline="${Brand.value.tagline}" '
+              'codes=${Brand.value.tagline.codeUnits}');
+        }
         if (e.key == '04_bill_detail') {
           final b = await AppDb.getBill(billId)
               .timeout(const Duration(seconds: 5), onTimeout: () => null);

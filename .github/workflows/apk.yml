@@ -78,13 +78,13 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls -l /dev/kvm || true
       - name: "Emulator runtime deps (run 7 fix: install qemu libpulse.so.0 dependency)"
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpulse0 libglu1-mesa
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpulse0 libglu1-mesa libxcb-cursor0
       - name: Emulator smoke test (real Android runtime; bounded, evidence preserved)
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 31
           arch: x86_64
-          emulator-options: -no-snapshot-save -noaudio -no-boot-anim -gpu swiftshader_indirect
+          emulator-options: -no-window -no-snapshot-save -noaudio -no-boot-anim -gpu swiftshader_indirect
           emulator-boot-timeout: 900
           script: |
             set +e

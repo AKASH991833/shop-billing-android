@@ -107,16 +107,39 @@ void main() {
     };
     // Pump INSIDE a real-async zone: pages load their DB data in initState,
     // and futures created in the fake zone never complete (Home captured with
-    // zero stats proved this in run 13). screenMatchesGolden is called after,
-    // sequentially - it manages its own runAsync for asset priming + capture.
+    // zero stats proved this in run 13). Run 16 proved 8 quick pumps inside
+    // runAsync are NOT enough either - every data page captured empty and
+    // BillDetailPage stayed on its spinner, then screenMatchesGolden's
+    // default pumpAndSettle hung on that infinite animation. Fixes:
+    //  1. real Future.delayed waits inside runAsync (real event-loop time,
+    //     not just yields) so FFI DB futures actually finish;
+    //  2. DIAG probes that query the same data directly in the same zone, so
+    //     a failure distinguishes "DB unreachable here" from "page load stuck";
+    //  3. customPump single-pump on screenMatchesGolden so a still-spinning
+    //     page captures honestly instead of timing out the whole run.
     for (final e in shots.entries) {
       await tester.runAsync(() async {
         await tester.pumpWidgetBuilder(e.value, wrapper: wrap, surfaceSize: phone);
-        for (var i = 0; i < 8; i++) {
-          await tester.pump(const Duration(milliseconds: 100));
+        for (var i = 0; i < 12; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+          await tester.pump();
+        }
+        final spinner =
+            find.byType(CircularProgressIndicator).evaluate().isNotEmpty;
+        final errors = find.byType(ErrorWidget).evaluate().length;
+        final probe = await AppDb.listBills()
+            .timeout(const Duration(seconds: 5), onTimeout: () => const []);
+        print('DIAG ${e.key}: spinner=$spinner errorWidgets=$errors '
+            'directListBills=${probe.length}');
+        if (e.key == '04_bill_detail') {
+          final b = await AppDb.getBill(billId)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+          print('DIAG 04 directGetBill(billId=$billId)=' +
+              (b == null ? 'NULL/TIMEOUT' : 'FOUND bill_no=${b["bill_no"]}'));
         }
       });
-      await screenMatchesGolden(tester, e.key);
+      await screenMatchesGolden(tester, e.key,
+          customPump: (t) async => t.pump());
     }
 
     // Invoice needs the seeded bill + items as plain maps.
@@ -125,10 +148,14 @@ void main() {
       final items = await AppDb.billItems(billId);
       await tester.pumpWidgetBuilder(InvoicePage(bill: bill, items: items),
           wrapper: wrap, surfaceSize: phone);
-      for (var i = 0; i < 8; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
+      for (var i = 0; i < 12; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await tester.pump();
       }
+      print('DIAG 05_invoice: spinner=' +
+          find.byType(CircularProgressIndicator).evaluate().isNotEmpty.toString());
     });
-    await screenMatchesGolden(tester, '05_invoice');
+    await screenMatchesGolden(tester, '05_invoice',
+        customPump: (t) async => t.pump());
   });
 }

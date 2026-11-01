@@ -365,14 +365,106 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) _loadSettings();
   }
 
+  bool hasPw = false;
+
   void _loadSettings() {
     () async {
       phone.text = await AppDb.setting('shop_phone');
       email.text = await AppDb.setting('shop_email');
       address.text = await AppDb.setting('shop_address');
       motto.text = await AppDb.setting('shop_motto');
+      hasPw = await AppDb.hasPassword();
       if (mounted) setState(() {});
     }();
+  }
+
+  Future<void> _passwordDialog() async {
+    final cur = TextEditingController();
+    final nw = TextEditingController();
+    final con = TextEditingController();
+    final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+              title: Text(hasPw ? 'Change password' : 'Set password'),
+              content: Column(mainAxisSize: MainAxisSize.min, children: [
+                if (hasPw)
+                  TextField(
+                      controller: cur,
+                      obscureText: true,
+                      decoration:
+                          const InputDecoration(labelText: 'Current password')),
+                TextField(
+                    controller: nw,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                        labelText: 'New password (min 8 characters)')),
+                TextField(
+                    controller: con,
+                    obscureText: true,
+                    decoration:
+                        const InputDecoration(labelText: 'Confirm new password')),
+              ]),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Save')),
+              ],
+            ));
+    if (ok != true || !mounted) return;
+    if (hasPw && !await AppDb.verifyPassword(cur.text)) {
+      if (mounted) toast(context, 'Current password is incorrect.');
+      return;
+    }
+    if (nw.text != con.text) {
+      if (mounted) toast(context, 'New passwords do not match.');
+      return;
+    }
+    try {
+      await AppDb.setPassword(nw.text);
+      if (mounted) {
+        setState(() => hasPw = true);
+        toast(context,
+            'Password saved. The app will ask for it on next start or after it goes to background.');
+      }
+    } on ArgumentError catch (e) {
+      if (mounted) toast(context, e.message.toString());
+    }
+  }
+
+  Future<void> _removePassword() async {
+    final cur = TextEditingController();
+    final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+              title: const Text('Remove app lock?'),
+              content: TextField(
+                  controller: cur,
+                  obscureText: true,
+                  autofocus: true,
+                  decoration:
+                      const InputDecoration(labelText: 'Current password')),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Remove')),
+              ],
+            ));
+    if (ok != true || !mounted) return;
+    if (!await AppDb.verifyPassword(cur.text)) {
+      if (mounted) toast(context, 'Current password is incorrect.');
+      return;
+    }
+    await AppDb.removePassword();
+    if (mounted) {
+      setState(() => hasPw = false);
+      toast(context, 'App lock removed - the app now opens without a password.');
+    }
   }
 
   @override
@@ -480,7 +572,7 @@ class _SettingsPageState extends State<SettingsPage> {
         builder: (ctx) => AlertDialog(
               title: const Text('Restore this backup?'),
               content: Text(
-                  '${p.basename(path)}\n\nThis replaces ALL current data on this phone. A safety copy of the current data is kept first.'),
+                  '${p.basename(path)}\n\nThis replaces ALL current data on this phone. A safety copy of the current data is kept first. If the backup has its own app password, THAT password will be required immediately after the restore - do not restore a backup whose password you do not know.'),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -586,7 +678,21 @@ class _SettingsPageState extends State<SettingsPage> {
         infoRow(
             const Text('App lock',
                 style: TextStyle(fontWeight: FontWeight.w600)),
-            const Text('Coming soon', style: TextStyle(fontSize: 12, color: kSoft))),
+            Wrap(spacing: 8, children: [
+              TextButton(
+                  onPressed: _passwordDialog,
+                  child: Text(hasPw ? 'Change' : 'Set password')),
+              if (hasPw)
+                TextButton(
+                    onPressed: _removePassword, child: const Text('Remove')),
+            ])),
+        Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(
+                hasPw
+                    ? 'App locks on startup and after backgrounding.'
+                    : 'No password set - the app opens without one. The lock is a screen lock only; the database file is not encrypted.',
+                style: const TextStyle(fontSize: 12, color: kSoft))),
       ]),
     );
   }

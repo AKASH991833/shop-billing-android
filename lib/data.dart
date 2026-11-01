@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
@@ -22,6 +25,12 @@ class AppDb {
   /// every visible screen reloads automatically when the database file is
   /// swapped under it - no manual reopening of screens needed.
   static final ValueNotifier<int> dataRevision = ValueNotifier<int>(0);
+
+  /// In-memory only: a fresh app start is always locked when a password is
+  /// set. A verified restore CLEARS this, so a backup carrying its own
+  /// password hash re-gates the app immediately (no restore-while-unlocked
+  /// bypass).
+  static bool sessionUnlocked = false;
 
   /// Schema version this build writes. A backup from a NEWER version is
   /// refused: integrity_check alone cannot tell an unrelated SQLite file (or
@@ -227,8 +236,81 @@ class AppDb {
         await open(); // bring the rolled-back live data back online
       } catch (_) {}
     }
-    if (verified) dataRevision.value++; // pages refresh automatically
+    if (verified) {
+      sessionUnlocked = false; // a restored password hash re-gates at once
+      dataRevision.value++; // pages refresh automatically
+    }
     return {'verified': verified, 'safety': safety};
+  }
+
+  // ---- Optional local app lock (ported from the desktop app) ----
+  // PBKDF2-HMAC-SHA256, 200,000 iterations, only the hash stored. This is a
+  // casual LOCAL screen lock - the database file is NOT encrypted.
+  static const int pbkdf2Iterations = 200000;
+
+  static String pbkdf2Hex(String password, String saltHex, int iterations) {
+    final key = utf8.encode(password);
+    final salt = <int>[
+      for (var i = 0; i < saltHex.length; i += 2)
+        int.parse(saltHex.substring(i, i + 2), radix: 16)
+    ];
+    final hmac = Hmac(sha256, key);
+    var u = hmac.convert(<int>[...salt, 0, 0, 0, 1]).bytes;
+    final t = List<int>.from(u);
+    for (var i = 1; i < iterations; i++) {
+      u = hmac.convert(u).bytes;
+      for (var j = 0; j < t.length; j++) {
+        t[j] ^= u[j];
+      }
+    }
+    return t.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  static Future<bool> hasPassword() async =>
+      (await setting('password_hash')) != null;
+
+  static Future<void> setPassword(String password) async {
+    if (password.length < 8) {
+      throw ArgumentError('Password must be at least 8 characters');
+    }
+    final r = Random.secure();
+    final salt = List.generate(16, (_) => r.nextInt(256))
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    final h = pbkdf2Hex(password, salt, pbkdf2Iterations);
+    await setSetting('password_hash', 'v2\$$salt\$$pbkdf2Iterations\$$h');
+  }
+
+  static Future<bool> verifyPassword(String password) async {
+    final stored = await setting('password_hash');
+    if (stored == null) return true;
+    final parts = stored.split('\$');
+    final String salt, hash;
+    final int iters;
+    if (parts[0] == 'v2' && parts.length == 4) {
+      salt = parts[1];
+      iters = int.parse(parts[2]);
+      hash = parts[3];
+    } else if (parts.length == 2) {
+      // legacy desktop format: salt\$hash at the original iteration count
+      salt = parts[0];
+      iters = pbkdf2Iterations;
+      hash = parts[1];
+    } else {
+      return false;
+    }
+    final cand = pbkdf2Hex(password, salt, iters);
+    if (cand.length != hash.length) return false;
+    var diff = 0; // constant-time compare
+    for (var i = 0; i < cand.length; i++) {
+      diff |= cand.codeUnitAt(i) ^ hash.codeUnitAt(i);
+    }
+    return diff == 0;
+  }
+
+  static Future<void> removePassword() async {
+    final db = await open();
+    await db.delete('settings', where: 'key=?', whereArgs: ['password_hash']);
   }
 
   /// Stores records parsed from a desktop records.csv as LEGACY REFERENCE

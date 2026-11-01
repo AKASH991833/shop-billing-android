@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'ui.dart';
+import 'applock.dart';
 import 'home.dart';
 import 'bills.dart';
 import 'new_bill.dart';
@@ -53,7 +54,7 @@ class BillingApp extends StatelessWidget {
               backgroundColor: kNavy,
               foregroundColor: Colors.white,
               elevation: 0)),
-      home: const Shell(),
+      home: const LockGate(child: Shell()),
     );
   }
 }

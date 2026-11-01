@@ -40,7 +40,7 @@ jobs:
           PY
       - run: flutter pub get
       - name: Data-layer tests (deposits, payments, returns, restart persistence, PDF render)
-        run: flutter test test/appdb_test.dart test/invoice_totals_test.dart test/newbill_totals_test.dart test/invoice_pdf_test.dart test/records_csv_test.dart
+        run: flutter test test/appdb_test.dart test/invoice_totals_test.dart test/newbill_totals_test.dart test/invoice_pdf_test.dart test/records_csv_test.dart test/applock_test.dart
       - name: Visual screen renders (Flutter software rasterizer, NOT Android execution)
         continue-on-error: true
         run: timeout 600 flutter test test/golden_screens_test.dart --update-goldens

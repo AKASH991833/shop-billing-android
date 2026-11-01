@@ -64,12 +64,24 @@ void main() {
     await settle(tester, 3);
     print('CHECKPOINT: item+rate entered');
 
+    // Dismiss the keyboard first: with real-time settles it finishes opening
+    // and the bottom inset covers/moves the button (tap missed in run 33).
+    FocusManager.instance.primaryFocus?.unfocus();
+    await settle(tester, 3);
+
     // Save and land on the bill detail. The button is a lazy ListView
     // child, so scroll it into existence first (ensureVisible cannot).
     await tester.scrollUntilVisible(find.text('Save Bill'), 250,
         scrollable: find.byType(Scrollable).first);
     await settle(tester, 3);
-    print('CHECKPOINT: save button visible, tapping');
+    final saveRect = tester.getRect(find.text('Save Bill'));
+    print('CHECKPOINT: save button visible at $saveRect, tapping');
+    print('CHECKPOINT: hitTest at save center -> ' +
+        tester
+            .hitTestOnBinding(saveRect.center)
+            .path
+            .map((e) => e.target.runtimeType.toString())
+            .join(' < '));
     await tester.tap(find.text('Save Bill'));
     print('CHECKPOINT: tapped, settling');
     await settle(tester);

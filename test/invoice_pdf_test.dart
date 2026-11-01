@@ -108,7 +108,7 @@ void main() {
   test('scripts the bundled fonts do not cover are refused even WITH fonts (no tofu)', () async {
     // Bengali is NOT in the bundled Noto Sans + Devanagari coverage.
     expect(
-        () => buildInvoicePdf(
+        () async => buildInvoicePdf(
               fonts: await testFonts(),
               bill: const {'bill_no': 'T-2', 'customer': 'অভিষেক', 'bill_date': '2026-11-01', 'type': 'SALE'},
               items: const [

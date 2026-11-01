@@ -33,6 +33,12 @@ void main() {
   });
 
   Future<dynamic> pumpForm(WidgetTester tester) async {
+    // The form is a lazy ListView: on the default 800x600 test surface the
+    // totals card is below the fold and never builds. Enlarge the surface so
+    // the whole form is laid out and findable.
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.runAsync(() async {
       await tester.pumpWidget(const MaterialApp(home: NewBillPage()));
       for (var i = 0; i < 6; i++) {

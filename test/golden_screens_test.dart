@@ -97,8 +97,17 @@ void main() {
       '10_settings': const SettingsPage(),
       '11_more': const MorePage(),
     };
+    // Pump INSIDE a real-async zone: pages load their DB data in initState,
+    // and futures created in the fake zone never complete (Home captured with
+    // zero stats proved this in run 13). screenMatchesGolden is called after,
+    // sequentially - it manages its own runAsync for asset priming + capture.
     for (final e in shots.entries) {
-      await tester.pumpWidgetBuilder(e.value, wrapper: wrap, surfaceSize: phone);
+      await tester.runAsync(() async {
+        await tester.pumpWidgetBuilder(e.value, wrapper: wrap, surfaceSize: phone);
+        for (var i = 0; i < 8; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      });
       await screenMatchesGolden(tester, e.key);
     }
 
@@ -108,6 +117,9 @@ void main() {
       final items = await AppDb.billItems(billId);
       await tester.pumpWidgetBuilder(InvoicePage(bill: bill, items: items),
           wrapper: wrap, surfaceSize: phone);
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
     });
     await screenMatchesGolden(tester, '05_invoice');
   });

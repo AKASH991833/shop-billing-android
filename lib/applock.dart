@@ -179,13 +179,13 @@ class _LockScreenState extends State<LockScreen> {
                     labelText: 'Password', border: OutlineInputBorder())),
             const SizedBox(height: 12),
             if (_error != null)
-              Text(_error!, style: const TextStyle(color: kDue)),
+              Text(_error!, style: const TextStyle(color: kRed)),
             if (lockout != null)
               Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                       'Too many tries - wait ${lockout.inSeconds + 1}s',
-                      style: const TextStyle(color: kDue))),
+                      style: const TextStyle(color: kRed))),
             const SizedBox(height: 12),
             SizedBox(
                 width: double.infinity,

@@ -267,7 +267,7 @@ class AppDb {
   }
 
   static Future<bool> hasPassword() async =>
-      (await setting('password_hash')) != null;
+      (await setting('password_hash')).isNotEmpty;
 
   static Future<void> setPassword(String password) async {
     if (password.length < 8) {
@@ -283,7 +283,7 @@ class AppDb {
 
   static Future<bool> verifyPassword(String password) async {
     final stored = await setting('password_hash');
-    if (stored == null) return true;
+    if (stored.isEmpty) return true;
     final parts = stored.split('\$');
     final String salt, hash;
     final int iters;

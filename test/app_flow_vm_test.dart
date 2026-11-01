@@ -18,8 +18,11 @@ void main() {
   });
 
   Future<void> settle(WidgetTester tester, [int times = 15]) async {
+    // Real event-loop time: LockGate's password check and sqflite FFI futures
+    // do not advance on FakeAsync pumps (same pattern as the golden test).
     for (var i = 0; i < times; i++) {
-      await tester.pump(const Duration(milliseconds: 60));
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await tester.pump();
     }
   }
 

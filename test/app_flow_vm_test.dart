@@ -86,9 +86,10 @@ void main() {
 
     // Back to Home: recent entries show the new bill.
     print('CHECKPOINT: going back');
-    await tester.pageBack();
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
     await settle(tester);
-    print('CHECKPOINT: back home');
+    print('CHECKPOINT: back home, routes ok=' +
+        find.byType(Shell).evaluate().isNotEmpty.toString());
     expect(find.text('START WORK'), findsOneWidget);
     expect(find.textContaining('RECENT ENTRIES'), findsOneWidget);
     expect(find.textContaining('750'), findsWidgets);

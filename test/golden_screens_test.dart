@@ -88,9 +88,9 @@ void main() {
     final shots = <String, Widget>{
       '01_shell_home': const Shell(),
       '02_new_bill': const NewBillPage(),
-      '03_bills_list': BillsPage(onOpenBill: (_) {}),
+      '03_bills_list': Scaffold(body: BillsPage(onOpenBill: (_) {})),
       '04_bill_detail': BillDetailPage(billId: billId),
-      '06_returns': ReturnsPage(onOpenBill: (_) {}),
+      '06_returns': Scaffold(body: ReturnsPage(onOpenBill: (_) {})),
       '07_stock': const StockPage(),
       '08_customers': const CustomersPage(),
       '09_reports': const ReportsPage(),

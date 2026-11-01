@@ -150,4 +150,75 @@ void main() {
     final b = await bill(id);
     expect(b['charges'], 3000.0);
   });
+
+  test('regression: plain sale with no deposit rows - listBills money fields are all doubles', () async {
+    // Bug caught by the VM flow test (run 12): totals() used to omit
+    // deposit_collected/refunded/deduction, so SQLite IFNULL(SUM(...),0)
+    // returned INTEGER 0 and listBills crashed on `as double` casts.
+    final id = await AppDb.addBill(
+      customerName: 'No Deposit Sale',
+      type: 'SALE',
+      billDate: AppDb.todayIso(),
+      items: [
+        {'description': 'Cotton saree', 'kind': 'SALE', 'qty': 2, 'rate': 750},
+      ],
+    );
+    final rows = await AppDb.listBills();
+    final m = rows.firstWhere((r) => r['id'] == id);
+    for (final k in [
+      'charges', 'paid_charges', 'balance_charges', 'deposit',
+      'deposit_collected', 'deposit_refunded', 'deposit_deduction',
+      'deposit_outstanding', 'deposit_held', 'total_to_pay',
+    ]) {
+      expect(m[k], isA<double>(), reason: '$k must be double, got ${m[k].runtimeType}');
+    }
+    expect(m['charges'], 1500.0);
+    expect(m['deposit_collected'], 0.0);
+    expect(m['deposit_held'], 0.0);
+    expect(m['status'], isNotEmpty);
+  });
+
+  test('regression: deposit agreed but zero collected, and empty-database reads', () async {
+    // Zero-collected deposit: the deposit row exists but collected is 0.
+    final id = await AppDb.addBill(
+      customerName: 'Zero Collected',
+      type: 'WEDDING',
+      billDate: AppDb.todayIso(),
+      returnDate: AppDb.todayIso(),
+      items: [
+        {'description': 'Lehenga', 'kind': 'RENTAL', 'qty': 1, 'days': 2, 'rate': 1000},
+      ],
+      depositAgreed: 3000,
+    );
+    final b = (await AppDb.getBill(id))!;
+    expect(b['deposit_collected'], 0.0);
+    expect(b['deposit_outstanding'], 3000.0);
+    expect(b['deposit_held'], 0.0);
+    // Whole-number rates must never surface as int through any money key.
+    for (final k in ['charges', 'balance_charges', 'deposit', 'deposit_outstanding', 'deposit_held', 'total_to_pay']) {
+      expect(b[k], isA<double>(), reason: '$k must be double');
+    }
+    // Dashboard over the shared test database must not throw on any mix.
+    final dash = await AppDb.dashboard();
+    expect(dash, isNotNull);
+  });
+
+  test('regression: create, save, close, reopen - bill and money views survive restart', () async {
+    final id = await AppDb.addBill(
+      customerName: 'Reopen Check',
+      type: 'SALE',
+      billDate: AppDb.todayIso(),
+      items: [
+        {'description': 'Kurta', 'kind': 'SALE', 'qty': 1, 'rate': 999},
+      ],
+      advance: 99,
+    );
+    await AppDb.debugClose();
+    final b = (await AppDb.getBill(id))!;
+    expect(b['charges'], 999.0);
+    expect(b['paid_charges'], 99.0);
+    expect(b['balance_charges'], 900.0);
+    final rows = await AppDb.listBills();
+    expect(rows.firstWhere((r) => r['id'] == id)['balance_charges'], 900.0);
+  });
 }

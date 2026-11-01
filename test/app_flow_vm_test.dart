@@ -27,6 +27,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(412, 892));
     await tester.pumpWidget(const BillingApp());
     await settle(tester);
+    print('CHECKPOINT: app pumped');
 
     // Home renders with section cards (no chart).
     expect(find.text('START WORK'), findsOneWidget);
@@ -35,6 +36,7 @@ void main() {
     await tester.tap(find.text('New Bill').first);
     await settle(tester);
     expect(find.text('Order Type'), findsOneWidget);
+    print('CHECKPOINT: new bill page open');
 
     // Fill the customer name.
     final nameField = find.ancestor(
@@ -42,6 +44,7 @@ void main() {
         matching: find.byType(TextField));
     expect(nameField, findsOneWidget);
     await tester.enterText(nameField.first, 'VM Flow Customer');
+    print('CHECKPOINT: name entered');
 
     // Scroll the item fields into view and fill them.
     await tester.scrollUntilVisible(find.text('Item name'), 120,
@@ -54,18 +57,24 @@ void main() {
         of: find.text('Rate'), matching: find.byType(TextField));
     await tester.enterText(rateField.first, '750');
     await settle(tester, 3);
+    print('CHECKPOINT: item+rate entered');
 
     // Save and land on the bill detail. The button is a lazy ListView
     // child, so scroll it into existence first (ensureVisible cannot).
     await tester.scrollUntilVisible(find.text('Save Bill'), 250,
         scrollable: find.byType(Scrollable).first);
     await settle(tester, 3);
+    print('CHECKPOINT: save button visible, tapping');
     await tester.tap(find.text('Save Bill'));
+    print('CHECKPOINT: tapped, settling');
     await settle(tester);
+    print('CHECKPOINT: settled after save');
     expect(find.textContaining('VM Flow Saree'), findsWidgets);
 
     // DB state: the bill exists with the right amount.
+    print('CHECKPOINT: querying DB');
     final bills = await AppDb.listBills();
+    print('CHECKPOINT: DB returned ' + bills.length.toString() + ' bills');
     final mine = bills.firstWhere(
         (b) => (b['customer'] as String).contains('VM Flow Customer'),
         orElse: () => const {});
@@ -74,8 +83,10 @@ void main() {
     expect(mine['balance_charges'], 750.0);
 
     // Back to Home: recent entries show the new bill.
+    print('CHECKPOINT: going back');
     await tester.pageBack();
     await settle(tester);
+    print('CHECKPOINT: back home');
     expect(find.text('START WORK'), findsOneWidget);
     expect(find.textContaining('RECENT ENTRIES'), findsOneWidget);
     expect(find.textContaining('750'), findsWidgets);

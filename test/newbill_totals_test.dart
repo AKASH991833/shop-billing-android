@@ -2,8 +2,8 @@
 // follow-up): the advance and deposit fields are money being RECEIVED at
 // save time, so no line may imply already-paid money is still due.
 //   Items Total          = sum of line amounts (rental = qty x days x rate)
-//   Total incl. deposit  = Items Total + Deposit collected  (obligation base)
-//   Receiving now        = Advance + Deposit collected      (cash at save)
+//   Total incl. deposit  = Items Total + Deposit received  (obligation base)
+//   Receiving now        = Advance + Deposit received      (cash at save)
 //   Balance Due (items)  = Items Total - Advance            (remaining)
 // Deposit money is refundable and never counted as items revenue. The form
 // collects the full deposit at billing (agreed == collected here);
@@ -59,13 +59,13 @@ void main() {
     await tester.pump();
 
     expect(find.text('₹6,500'), findsOneWidget); // Items Total
-    expect(find.text('₹2,000'), findsOneWidget); // Deposit collected
+    expect(find.text('₹2,000'), findsOneWidget); // Deposit received
     expect(find.text('₹8,500'), findsOneWidget); // Total incl. deposit
     expect(find.text('₹3,000'), findsOneWidget); // Receiving now
     expect(find.text('₹5,500'), findsOneWidget); // Balance Due (items)
     expect(find.text('Total incl. deposit'), findsOneWidget);
     expect(find.text('Receiving now (advance + deposit)'), findsOneWidget);
-    expect(find.text('Deposit collected (refundable, not revenue)'),
+    expect(find.text('Deposit received (refundable, not revenue)'),
         findsOneWidget);
     // The ambiguous "collect again" label must not come back.
     expect(find.text('To Collect Now'), findsNothing);

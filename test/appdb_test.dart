@@ -253,6 +253,44 @@ void main() {
         isFalse);
   });
 
+  test('restore refuses an unrelated but VALID SQLite file - integrity is not compatibility', () async {
+    final dir = await getDatabasesPath();
+    final alien = p.join(dir, 'alien-probe.db');
+    final adb = await openDatabase(alien);
+    await adb.execute('CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)');
+    await adb.execute("INSERT INTO notes (body) VALUES ('hello')");
+    await adb.close(); // passes integrity_check, but is not a shop backup
+    final before = await AppDb.listBills();
+    expect(() => AppDb.restoreBackup(alien), throwsArgumentError);
+    expect((await AppDb.listBills()).length, before.length,
+        reason: 'live data must be untouched');
+  });
+
+  test('restore refuses a backup from a newer schema version, keeping live data', () async {
+    final r = await AppDb.backupNow();
+    final path = r['path'] as String;
+    final fdb = await openDatabase(path);
+    await fdb.execute('PRAGMA user_version = 99'); // simulate a future app version
+    await fdb.close();
+    final before = await AppDb.listBills();
+    expect(() => AppDb.restoreBackup(path), throwsArgumentError);
+    expect((await AppDb.listBills()).length, before.length,
+        reason: 'live data must be untouched');
+  });
+
+  test('a successful restore reopens the database and bumps the data revision', () async {
+    final r = await AppDb.backupNow();
+    final revBefore = AppDb.dataRevision.value;
+    final rr = await AppDb.restoreBackup(r['path'] as String);
+    expect(rr['verified'], isTrue);
+    expect(AppDb.dataRevision.value, revBefore + 1,
+        reason: 'pages listen to dataRevision to refresh after a restore');
+    // Reopened-from-disk evidence: drop the cached connection and read again.
+    await AppDb.debugClose();
+    final rows = await AppDb.listBills();
+    expect(rows, isNotNull);
+  });
+
   test('restore refuses a corrupt file without touching live data', () async {
     final dir = await getDatabasesPath();
     final bad = p.join(dir, 'corrupt-probe.db');

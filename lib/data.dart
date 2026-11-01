@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 
@@ -15,6 +16,53 @@ class AppDb {
   static Future<void> debugClose() async {
     await _db?.close();
     _db = null;
+  }
+
+  /// Bumped after a successful restore. List pages subscribe in initState so
+  /// every visible screen reloads automatically when the database file is
+  /// swapped under it - no manual reopening of screens needed.
+  static final ValueNotifier<int> dataRevision = ValueNotifier<int>(0);
+
+  /// Schema version this build writes. A backup from a NEWER version is
+  /// refused: integrity_check alone cannot tell an unrelated SQLite file (or
+  /// a future schema) apart from a real backup of this app.
+  static const int schemaVersion = 1;
+
+  static const Map<String, List<String>> _expectedColumns = {
+    'customers': ['id', 'name', 'mobile', 'created_at'],
+    'bills': ['id', 'bill_no', 'customer_id', 'type', 'bill_date', 'created_at'],
+    'bill_items': ['id', 'bill_id', 'description', 'kind', 'qty', 'days', 'rate', 'amount'],
+    'payments': ['id', 'bill_id', 'paid_at', 'amount', 'mode', 'purpose'],
+    'deposits': ['id', 'bill_id', 'amount', 'collected_amount', 'status'],
+    'inventory': ['id', 'name', 'total_qty'],
+    'settings': ['key', 'value'],
+  };
+
+  /// Structural compatibility check on a candidate backup file. Returns null
+  /// when the file is restorable by this build, else a human-readable reason.
+  static Future<String?> backupCompatError(String path) async {
+    Database? d;
+    try {
+      d = await openDatabase(path, readOnly: true);
+      final v = (await d.rawQuery('PRAGMA user_version')).first.values.first;
+      final version = (v as num).toInt();
+      if (version > schemaVersion) {
+        return 'it was made by a newer version of the app (schema v$version)';
+      }
+      for (final t in _expectedColumns.keys) {
+        final cols = await d.rawQuery('PRAGMA table_info($t)');
+        if (cols.isEmpty) return 'it has no $t table';
+        final have = cols.map((c) => c['name'] as String).toSet();
+        for (final col in _expectedColumns[t]!) {
+          if (!have.contains(col)) return 'its $t table has no $col column';
+        }
+      }
+      return null;
+    } catch (_) {
+      return 'it is not a readable SQLite database';
+    } finally {
+      await d?.close();
+    }
   }
 
   static Future<Database> open() async {
@@ -130,6 +178,13 @@ class AppDb {
     if (!await _integrityOk(srcPath)) {
       throw ArgumentError('Backup file failed integrity check - not restoring');
     }
+    // Integrity is not compatibility: an unrelated valid SQLite file passes
+    // integrity_check. Validate schema version + tables/columns BEFORE the
+    // live database is touched.
+    final compat = await backupCompatError(srcPath);
+    if (compat != null) {
+      throw ArgumentError('That file is not a backup of this app: $compat.');
+    }
     final srcCounts = await _tableCounts(srcPath);
     final dir = await getDatabasesPath();
     final dest = p.join(dir, 'shop.db');
@@ -147,8 +202,15 @@ class AppDb {
       if (await file.exists()) await file.delete();
     }
     await File(srcPath).copy(dest);
-    final verified =
-        await _integrityOk(dest) && _countsEqual(await _tableCounts(dest), srcCounts);
+    var verified = await _integrityOk(dest) &&
+        _countsEqual(await _tableCounts(dest), srcCounts);
+    if (verified) {
+      try {
+        await open(); // real reopen through the app path, incl. migrations
+      } catch (_) {
+        verified = false;
+      }
+    }
     if (!verified && safety != null) {
       for (final f in [dest, '$dest-wal', '$dest-shm']) {
         final file = File(f);
@@ -156,7 +218,11 @@ class AppDb {
       }
       await File(safety).copy(dest); // roll back to the safety copy
       await debugClose();
+      try {
+        await open(); // bring the rolled-back live data back online
+      } catch (_) {}
     }
+    if (verified) dataRevision.value++; // pages refresh automatically
     return {'verified': verified, 'safety': safety};
   }
 

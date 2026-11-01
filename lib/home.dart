@@ -20,9 +20,21 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, Object?>> recent = const [];
 
   @override
+  @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
     _load();
+  }
+
+  void _onDataChanged() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {

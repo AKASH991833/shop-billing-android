@@ -149,7 +149,7 @@ class _NewBillPageState extends State<NewBillPage> {
           const SizedBox(width: 10),
           Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            fieldLabel('Security Deposit, refundable (\u20B9)'),
+            fieldLabel('Security deposit received - refundable (\u20B9)'),
             TextField(
                 controller: deposit,
                 keyboardType: TextInputType.number,
@@ -169,7 +169,7 @@ class _NewBillPageState extends State<NewBillPage> {
             //   Receiving now       = advance + deposit collected
             //   Balance due (items) = items - advance
             _t('Items Total', money(itemsTotal)),
-            _t('Deposit collected (refundable, not revenue)', money(depositVal)),
+            _t('Deposit received (refundable, not revenue)', money(depositVal)),
             const Divider(color: Colors.white24),
             _t('Total incl. deposit', money(itemsTotal + depositVal), strong: true),
             _t('Receiving now (advance + deposit)', money(advanceVal + depositVal)),

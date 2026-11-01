@@ -48,9 +48,21 @@ class _StockPageState extends State<StockPage> {
   List<Map<String, Object?>> items = const [];
 
   @override
+  @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
     _load();
+  }
+
+  void _onDataChanged() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -172,9 +184,21 @@ class _CustomersPageState extends State<CustomersPage> {
   List<Map<String, Object?>> customers = const [];
 
   @override
+  @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
     _load();
+  }
+
+  void _onDataChanged() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -237,6 +261,21 @@ class _ReportsPageState extends State<ReportsPage> {
   @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
+    _load();
+  }
+
+  void _onDataChanged() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
+    super.dispose();
+  }
+
+  void _load() {
     final now = DateTime.now();
     final from = DateTime(now.year, now.month, 1).toIso8601String().substring(0, 10);
     final to = AppDb.todayIso();
@@ -316,6 +355,15 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
+    _loadSettings();
+  }
+
+  void _onDataChanged() {
+    if (mounted) _loadSettings();
+  }
+
+  void _loadSettings() {
     () async {
       phone.text = await AppDb.setting('shop_phone');
       email.text = await AppDb.setting('shop_email');
@@ -327,6 +375,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
     phone.dispose();
     email.dispose();
     address.dispose();
@@ -380,7 +429,7 @@ class _SettingsPageState extends State<SettingsPage> {
       toast(
           context,
           r['verified'] == true
-              ? 'Backup restored & verified. Reopen any screen to see the data.'
+              ? 'Backup restored & verified - every screen refreshes automatically.'
               : 'Restore failed verification - your previous data was kept.');
     } catch (e) {
       if (mounted) {

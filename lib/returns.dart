@@ -13,9 +13,21 @@ class ReturnsPageState extends State<ReturnsPage> {
   List<Map<String, Object?>> active = const [];
 
   @override
+  @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
     reload();
+  }
+
+  void _onDataChanged() {
+    if (mounted) reload();
+  }
+
+  @override
+  void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
+    super.dispose();
   }
 
   Future<void> reload() async {

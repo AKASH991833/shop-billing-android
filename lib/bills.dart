@@ -15,9 +15,21 @@ class BillsPageState extends State<BillsPage> {
   List<Map<String, Object?>> bills = const [];
 
   @override
+  @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
     reload();
+  }
+
+  void _onDataChanged() {
+    if (mounted) reload();
+  }
+
+  @override
+  void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
+    super.dispose();
   }
 
   Future<void> reload() async {
@@ -105,9 +117,21 @@ class _BillDetailPageState extends State<BillDetailPage> {
   List<Map<String, Object?>> payments = const [];
 
   @override
+  @override
   void initState() {
     super.initState();
+    AppDb.dataRevision.addListener(_onDataChanged);
     _load();
+  }
+
+  void _onDataChanged() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    AppDb.dataRevision.removeListener(_onDataChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {

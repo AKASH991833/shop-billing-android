@@ -51,6 +51,16 @@ class AppDb {
     return _db!;
   }
 
+  /// Shop contact details + footer motto from Settings, for printing on
+  /// invoices. Blank values are omitted by the renderer - never a literal
+  /// "Not set".
+  static Future<Map<String, String>> shopContact() async => {
+        'phone': await setting('shop_phone'),
+        'email': await setting('shop_email'),
+        'address': await setting('shop_address'),
+        'motto': await setting('shop_motto'),
+      };
+
   static String todayIso() =>
       DateTime.now().toLocal().toIso8601String().substring(0, 10);
 

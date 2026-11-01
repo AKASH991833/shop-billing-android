@@ -203,9 +203,13 @@ class _BillDetailPageState extends State<BillDetailPage> {
               OutlinedButton(
                   style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(46)),
-                  onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => InvoicePage(bill: b, items: items))),
+                  onPressed: () async {
+                    final shop = await AppDb.shopContact();
+                    if (!context.mounted) return;
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) =>
+                            InvoicePage(bill: b, items: items, shop: shop)));
+                  },
                   child: const Text('View Invoice')),
             ]),
     );

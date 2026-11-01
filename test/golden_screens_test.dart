@@ -166,7 +166,13 @@ void main() {
     await tester.runAsync(() async {
       final bill = (await AppDb.getBill(billId))!;
       final items = await AppDb.billItems(billId);
-      await tester.pumpWidgetBuilder(InvoicePage(bill: bill, items: items),
+      await tester.pumpWidgetBuilder(
+          InvoicePage(bill: bill, items: items, shop: const {
+            'phone': '05424 250 250',
+            'email': '',
+            'address': 'Shop 12, Gandhi Chowk',
+            'motto': 'Handpicked weaves, fair prices',
+          }),
           wrapper: wrap, surfaceSize: phone);
       for (var i = 0; i < 12; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 200));

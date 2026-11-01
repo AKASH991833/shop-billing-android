@@ -88,4 +88,45 @@ void main() {
     expect(find.textContaining('Total Outstanding'), findsNothing);
     expect(find.textContaining('To Collect'), findsNothing);
   });
+
+  testWidgets('shop contact + footer motto print when set, never literal Not set',
+      (tester) async {
+    final b = bill(
+        charges: 1950, paidCharges: 500, deposit: 0, depositCollected: 0,
+        type: 'SALE');
+    final items = <Map<String, Object?>>[
+      {'description': 'Cotton saree', 'kind': 'SALE', 'qty': 3.0, 'days': 1.0, 'rate': 650.0, 'amount': 1950.0},
+    ];
+    await tester.pumpWidget(MaterialApp(
+        home: InvoicePage(bill: b, items: items, shop: const {
+      'phone': '05424 222333',
+      'email': 'shop@example.com',
+      'address': 'Shop 12, Gandhi Chowk',
+      'motto': 'Fair prices always',
+    })));
+    await tester.pump();
+
+    expect(find.textContaining('05424 222333'), findsOneWidget);
+    expect(find.textContaining('shop@example.com'), findsOneWidget);
+    expect(find.textContaining('Shop 12, Gandhi Chowk'), findsOneWidget);
+    expect(find.textContaining('Fair prices always'), findsOneWidget);
+    // The Settings placeholders are hints only - they must never print.
+    expect(find.textContaining('Not set'), findsNothing);
+  });
+
+  testWidgets('blank shop contact prints no contact line and no Not set',
+      (tester) async {
+    final b = bill(
+        charges: 1950, paidCharges: 500, deposit: 0, depositCollected: 0,
+        type: 'SALE');
+    final items = <Map<String, Object?>>[
+      {'description': 'Cotton saree', 'kind': 'SALE', 'qty': 3.0, 'days': 1.0, 'rate': 650.0, 'amount': 1950.0},
+    ];
+    await tester
+        .pumpWidget(MaterialApp(home: InvoicePage(bill: b, items: items)));
+    await tester.pump();
+
+    expect(find.textContaining('Not set'), findsNothing);
+    expect(find.textContaining('05424'), findsNothing);
+  });
 }

@@ -9,7 +9,9 @@ import 'main.dart';
 class InvoicePage extends StatelessWidget {
   final Map<String, Object?> bill;
   final List<Map<String, Object?>> items;
-  const InvoicePage({super.key, required this.bill, required this.items});
+  final Map<String, String> shop;
+  const InvoicePage(
+      {super.key, required this.bill, required this.items, this.shop = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +21,12 @@ class InvoicePage extends StatelessWidget {
         ? 'Walk-in #${bill['customer_id']}'
         : bill['customer'] as String;
     final mobile = bill['mobile'] as String? ?? '';
+    final contact = [
+      shop['phone'] ?? '',
+      shop['email'] ?? '',
+      shop['address'] ?? ''
+    ].where((v) => v.trim().isNotEmpty).join(' \u00B7 ');
+    final footerMotto = (shop['motto'] ?? '').trim();
     return Scaffold(
       appBar: AppBar(title: Text('Invoice ${bill['bill_no']}')),
       body: ListView(padding: const EdgeInsets.all(12), children: [
@@ -63,6 +71,11 @@ class InvoicePage extends StatelessWidget {
                         color: kGold)),
               ]),
             ]),
+            if (contact.isNotEmpty)
+              Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(contact,
+                      style: const TextStyle(fontSize: 9, color: kSoft))),
             Container(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 padding: const EdgeInsets.symmetric(vertical: 5),
@@ -127,6 +140,12 @@ class InvoicePage extends StatelessWidget {
                         bottomLeft: Radius.circular(10),
                         bottomRight: Radius.circular(10))),
                 child: Column(children: [
+                  if (footerMotto.isNotEmpty)
+                    Text(footerMotto,
+                        style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 9,
+                            fontStyle: FontStyle.italic)),
                   Text('Thank you for shopping with ${Brand.value.shopName}!',
                       style: const TextStyle(
                           color: Colors.white,

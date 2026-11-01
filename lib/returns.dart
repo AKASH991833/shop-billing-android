@@ -60,7 +60,7 @@ class ReturnsPageState extends State<ReturnsPage> {
         const Padding(
             padding: EdgeInsets.only(top: 8),
             child: Text(
-                'Marking a return only records the garments coming back. The deposit refund is recorded separately, with any deduction for damage or late fees.',
+                'Marking a return only records the garments coming back. The deposit refund is recorded separately, with any adjustment the owner records.',
                 style: TextStyle(fontSize: 11.5, color: kSoft))),
       ])),
     ]);

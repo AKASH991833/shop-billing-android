@@ -85,10 +85,15 @@ void main() {
     expect(mine['balance_charges'], 750.0);
 
     // Back to Home: recent entries show the new bill.
-    print('CHECKPOINT: going back');
-    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+    // Verify the REAL AppBar back button (user interaction path). Run 13's
+    // pageBack() tap produced a hit-test warning and no pop; this taps the
+    // BackButton directly and asserts the Shell is actually back.
+    print('CHECKPOINT: going back via AppBar BackButton tap');
+    final backBtn = find.byType(BackButton);
+    expect(backBtn, findsOneWidget);
+    await tester.tap(backBtn);
     await settle(tester);
-    print('CHECKPOINT: back home, routes ok=' +
+    print('CHECKPOINT: after back tap, shell visible=' +
         find.byType(Shell).evaluate().isNotEmpty.toString());
     expect(find.text('START WORK'), findsOneWidget);
     expect(find.textContaining('RECENT ENTRIES'), findsOneWidget);

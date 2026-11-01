@@ -76,8 +76,11 @@ Widget statusPill(String status) {
   }
 }
 
-InputDecoration fieldDec([String? hint]) => InputDecoration(
+InputDecoration fieldDec([String? hint, String? label]) => InputDecoration(
     hintText: hint,
+    labelText: label,
+    floatingLabelBehavior:
+        label == null ? null : FloatingLabelBehavior.always,
     filled: true,
     fillColor: Colors.white,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

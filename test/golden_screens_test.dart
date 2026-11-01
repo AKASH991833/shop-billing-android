@@ -4,6 +4,7 @@
 // PNGs show the actual UI layout, colours and text as coded.
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:sqflite/sqflite.dart';
@@ -42,6 +43,13 @@ void main() {
     final tmp = await Directory.systemTemp.createTemp('shopdb_goldens');
     await databaseFactoryFfi.setDatabasesPath(tmp.path);
     await loadAppFonts();
+    // The brand title uses fontFamily 'serif' (the phone's platform serif on
+    // a real device). The test renderer has no 'serif' and falls back to Ahem
+    // blocks, so register real glyphs under that family name.
+    final serif = FontLoader('serif')
+      ..addFont(
+          rootBundle.load('packages/golden_toolkit/fonts/Roboto-Regular.ttf'));
+    await serif.load();
     await Brand.load();
   });
 

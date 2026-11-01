@@ -256,7 +256,7 @@ class _NewBillPageState extends State<NewBillPage> {
             return TextField(
                 controller: controller,
                 focusNode: focus,
-                decoration: fieldDec('Item name'));
+                decoration: fieldDec(null, 'Item name'));
           },
         ),
         const SizedBox(height: 8),
@@ -274,7 +274,7 @@ class _NewBillPageState extends State<NewBillPage> {
           const SizedBox(width: 8),
           Expanded(
               child: TextField(
-                  controller: l.colour, decoration: fieldDec('Colour (optional)'))),
+                  controller: l.colour, decoration: fieldDec(null, 'Colour (optional)'))),
         ]),
         const SizedBox(height: 8),
         Row(children: [
@@ -282,7 +282,7 @@ class _NewBillPageState extends State<NewBillPage> {
               child: TextField(
                   controller: l.qty,
                   keyboardType: TextInputType.number,
-                  decoration: fieldDec('Qty'),
+                  decoration: fieldDec(null, 'Qty'),
                   onChanged: (_) => setState(() {}))),
           if (l.kind == 'RENTAL') ...[
             const SizedBox(width: 8),
@@ -290,7 +290,7 @@ class _NewBillPageState extends State<NewBillPage> {
                 child: TextField(
                     controller: l.days,
                     keyboardType: TextInputType.number,
-                    decoration: fieldDec('Days'),
+                    decoration: fieldDec(null, 'Days'),
                     onChanged: (_) => setState(() {}))),
           ],
           const SizedBox(width: 8),
@@ -299,12 +299,12 @@ class _NewBillPageState extends State<NewBillPage> {
                   controller: l.rate,
                   keyboardType: TextInputType.number,
                   decoration:
-                      fieldDec(l.kind == 'RENTAL' ? 'Rate/Day' : 'Rate'),
+                      fieldDec(null, l.kind == 'RENTAL' ? 'Rate/Day' : 'Rate'),
                   onChanged: (_) => setState(() {}))),
           const SizedBox(width: 8),
           Expanded(
               child: InputDecorator(
-                  decoration: fieldDec(),
+                  decoration: fieldDec(null, 'Amount'),
                   child: Text(money(l.amount),
                       style: const TextStyle(fontWeight: FontWeight.w700)))),
         ]),

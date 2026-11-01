@@ -214,7 +214,7 @@ class InvoicePage extends StatelessWidget {
         const Padding(
             padding: EdgeInsets.only(top: 10),
             child: Text(
-                'PDF export and printing from the phone are not verified yet - this is the on-screen invoice preview.',
+                'PDF export available. Phone sharing and printing still need device verification.',
                 style: TextStyle(fontSize: 11.5, color: kSoft))),
       ]),
     );

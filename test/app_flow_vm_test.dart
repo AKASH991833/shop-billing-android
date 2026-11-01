@@ -55,8 +55,10 @@ void main() {
     await tester.enterText(rateField.first, '750');
     await settle(tester, 3);
 
-    // Save and land on the bill detail.
-    await tester.ensureVisible(find.text('Save Bill'));
+    // Save and land on the bill detail. The button is a lazy ListView
+    // child, so scroll it into existence first (ensureVisible cannot).
+    await tester.scrollUntilVisible(find.text('Save Bill'), 250,
+        scrollable: find.byType(Scrollable).first);
     await settle(tester, 3);
     await tester.tap(find.text('Save Bill'));
     await settle(tester);

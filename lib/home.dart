@@ -190,14 +190,20 @@ class _HomePageState extends State<HomePage> {
           color: Colors.white,
           border: Border.all(color: kLine),
           borderRadius: BorderRadius.circular(14)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label.toUpperCase(),
-            style: const TextStyle(fontSize: 10.5, color: kSoft, letterSpacing: 0.4)),
-        const Spacer(),
-        Text(value,
-            style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.w700, color: color)),
-      ]));
+      child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label.toUpperCase(),
+                    style: const TextStyle(fontSize: 10.5, color: kSoft, letterSpacing: 0.4)),
+                const SizedBox(height: 6),
+                Text(value,
+                    style: TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.w700, color: color)),
+              ])));
 
   Widget _act(IconData icon, String label, VoidCallback onTap) => InkWell(
       onTap: onTap,
@@ -207,11 +213,13 @@ class _HomePageState extends State<HomePage> {
               color: Colors.white,
               border: Border.all(color: kLine),
               borderRadius: BorderRadius.circular(13)),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, color: kNavy, size: 22),
-            const SizedBox(height: 5),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700, color: kNavy)),
-          ])));
+          child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, color: kNavy, size: 22),
+                const SizedBox(height: 5),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w700, color: kNavy)),
+              ]))));
 }

@@ -1,39 +1,47 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:shop_billing/data.dart';
 import 'package:shop_billing/main.dart' as app;
 
-// Android-runtime smoke suite (runs on the emulator job, real ART).
+// Android-runtime smoke suite (emulator job, real ART).
 // Labels: taps/keyboard go through the Flutter engine on a real Android
 // runtime - NOT adb-input native touch. handleAppLifecycleStateChanged is an
-// engine-delivered lifecycle event - the OS-level background/resume gate is
-// exercised separately at the end via SystemNavigator.pop + adb relaunch in
-// the workflow script (diagnostic evidence, preserved in artifacts).
+// engine-delivered lifecycle event, not an OS background. The OS-level
+// cold-start and HOME/resume lock checks run separately in
+// .github/scripts/lock_relaunch.py via adb (native, outside the engine).
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<void> settle(WidgetTester t, [int secs = 8]) =>
+      t.pumpAndSettle(Duration(seconds: secs));
 
   Future<void> shot(String name) async {
     try {
       await binding.takeScreenshot(name);
     } catch (e) {
-      print('SMOKE screenshot $name unsupported here: $e');
+      print('SMOKE screenshot $name failed: $e');
     }
   }
 
-  testWidgets('smoke: home renders on the Android runtime', (tester) async {
+  Future<void> launch(WidgetTester t) async {
     app.main();
-    await tester.pumpAndSettle(const Duration(seconds: 10));
+    await settle(t, 10);
+    // Required before takeScreenshot on this backend (run 37 error).
+    await binding.convertFlutterSurfaceToImage();
+    await t.pump();
+  }
+
+  testWidgets('smoke: home renders on the Android runtime', (tester) async {
+    await launch(tester);
     expect(find.text('START WORK'), findsOneWidget);
     await shot('01_home');
   });
 
   testWidgets('smoke: sale bill saves through the real UI', (tester) async {
-    app.main();
-    await tester.pumpAndSettle(const Duration(seconds: 10));
+    await launch(tester);
     await tester.tap(find.text('New Bill').first);
-    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await settle(tester, 3);
     expect(find.text('Order Type'), findsOneWidget);
 
     final nameField = find.ancestor(
@@ -78,19 +86,27 @@ void main() {
     expect(mine.first['charges'], 750.0);
   });
 
+  testWidgets('smoke: More page renders on the Android runtime', (tester) async {
+    await launch(tester);
+    await tester.tap(find.byIcon(Icons.more_horiz));
+    await settle(tester, 3);
+    await shot('04_more');
+    expect(find.byIcon(Icons.more_horiz), findsWidgets);
+  });
+
   testWidgets('smoke: app lock gates launch and pause/resume', (tester) async {
     await AppDb.setPassword('smoke-lock-99');
-    app.main(); // fresh launch WITH a password set
-    await tester.pumpAndSettle(const Duration(seconds: 10));
+    await launch(tester); // fresh launch WITH a password set
     expect(find.text('Locked'), findsOneWidget,
         reason: 'launch gate must engage when a password exists');
-    await shot('04_lock_screen');
+    await shot('05_lock_screen');
 
     await tester.enterText(find.byType(TextField).first, 'smoke-lock-99');
     await tester.tap(find.text('Unlock'));
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    await settle(tester, 5);
     expect(find.text('START WORK'), findsOneWidget,
         reason: 'correct password must unlock');
+    await shot('06_unlocked_home');
 
     // Engine-delivered pause (labeled: not an OS event) must re-arm the gate.
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -98,15 +114,12 @@ void main() {
     expect(find.text('Locked'), findsOneWidget,
         reason: 'pause must re-arm the gate');
 
-    // Unlock again so the OS-background path starts from an unlocked state.
+    // Unlock again and finish unlocked; the OS-level cold-start and
+    // HOME/resume checks run in lock_relaunch.py against this same device
+    // state (password persists in app data).
     await tester.enterText(find.byType(TextField).first, 'smoke-lock-99');
     await tester.tap(find.text('Unlock'));
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    await settle(tester, 5);
     expect(find.text('START WORK'), findsOneWidget);
-
-    // Real OS background, LAST: the workflow relaunches via adb monkey and
-    // screencaps; lock gate on resume is checked from the UI XML dump.
-    await SystemNavigator.pop();
-    await Future<void>.delayed(const Duration(seconds: 3));
   });
 }

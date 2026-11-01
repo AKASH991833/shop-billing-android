@@ -9,6 +9,7 @@ for _ in range(60):
         break
     time.sleep(3)
 time.sleep(10)
+sh('shell', 'uninstall', 'com.example.shop_billing')  # debug build from the smoke suite has a different signature
 print(sh('install', '-r', 'build/app/outputs/flutter-apk/app-x86_64-release.apk'))
 sh('shell', 'monkey', '-p', 'com.example.shop_billing',
    '-c', 'android.intent.category.LAUNCHER', '1')

@@ -162,6 +162,24 @@ void main() {
           customPump: (t) async => t.pump());
     }
 
+    // Settings scrolled to the bottom: the DATA rows (App lock, scope notes)
+    // sit below the first viewport, so capture them explicitly.
+    await tester.runAsync(() async {
+      await tester.pumpWidgetBuilder(const SettingsPage(),
+          wrapper: wrap, surfaceSize: phone);
+      for (var i = 0; i < 12; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await tester.pump();
+      }
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -1600));
+      for (var i = 0; i < 4; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pump();
+      }
+    });
+    await screenMatchesGolden(tester, '10b_settings_bottom',
+        customPump: (t) async => t.pump());
+
     // Invoice needs the seeded bill + items as plain maps.
     await tester.runAsync(() async {
       final bill = (await AppDb.getBill(billId))!;

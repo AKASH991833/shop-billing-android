@@ -10,9 +10,15 @@ import 'package:shop_billing/main.dart' as app;
 // Android-runtime smoke suite (emulator job, real ART).
 // Labels: taps/keyboard go through the Flutter engine on a real Android
 // runtime - NOT adb-input native touch. handleAppLifecycleStateChanged is an
-// engine-delivered lifecycle event, not an OS background. The OS-level
-// cold-start and HOME/resume lock checks run separately in
-// .github/scripts/lock_relaunch.py via adb (native, outside the engine).
+// engine-delivered lifecycle event, not an OS background. OS-level lock
+// checks (persistence, HOME+relaunch re-arm, native-input unlock) run in
+// .github/scripts/lock_relaunch.py via adb CONCURRENTLY, during the native
+// window at the end of the lock test - the flutter tool uninstalls the app
+// when the session ends, and a true process-death cold start would kill the
+// test isolate itself, so cold-start-after-process-death is NOT covered.
+// Pixels come from native adb screencaps triggered by the state handshake;
+// the Flutter tool's takeScreenshot is deliberately not used here (its
+// conversion hung twice on this swiftshader backend).
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -27,21 +33,14 @@ void main() {
     }
   }
 
-  Future<void> shot(String name) async {
-    try {
-      await binding.takeScreenshot(name);
-    } catch (e) {
-      print('SMOKE screenshot $name failed: $e');
-    }
-  }
-
   // State handshake for the native side: run_smoke.sh polls this file and
   // grabs an adb screencap at each known app state, so real Android pixels
   // exist even when the Flutter tool's screenshot conversion fails.
   Future<void> mark(String state) async {
     print('SMOKE_STATE=$state');
     try {
-      File('/sdcard/shop_billing_state.txt').writeAsStringSync(state);
+      File('/storage/emulated/0/Android/data/com.example.shop_billing'
+          '/files/shop_billing_state.txt').writeAsStringSync(state);
     } catch (e) {
       print('SMOKE state file write failed: $e');
     }
@@ -50,8 +49,6 @@ void main() {
   Future<void> launch(WidgetTester t) async {
     app.main();
     await settle(t, 10);
-    // Required before takeScreenshot on this backend (run 37 error).
-    await binding.convertFlutterSurfaceToImage();
     await t.pump();
   }
 
@@ -59,7 +56,6 @@ void main() {
     await launch(tester);
     expect(find.text('START WORK'), findsOneWidget);
     await mark('home');
-    await shot('01_home');
   });
 
   testWidgets('smoke: sale bill saves through the real UI', (tester) async {
@@ -92,7 +88,6 @@ void main() {
     await tester.scrollUntilVisible(find.text('Save Bill'), 250,
         scrollable: find.byType(Scrollable).first);
     await settle(tester, 2);
-    await shot('02_before_save');
     await tester.tap(find.text('Save Bill'));
     await settle(tester, 5);
 
@@ -104,7 +99,6 @@ void main() {
     final bills = await AppDb.listBills();
     print('SMOKE after-save: snackbar=$snack backButton=$backBtn '
         'stillOnForm=$stillForm dbBills=${bills.length}');
-    await shot('03_after_save');
     expect(stillForm, isFalse, reason: 'tap did not leave the form');
     final mine = bills.where(
         (b) => (b['customer'] as String).contains('Smoke Customer'));
@@ -120,7 +114,6 @@ void main() {
         reason: 'More page must show its rows');
     expect(find.text('Settings'), findsWidgets);
     await mark('more');
-    await shot('04_more');
   });
 
   testWidgets('smoke: app lock gates launch and pause/resume', (tester) async {
@@ -138,7 +131,6 @@ void main() {
       expect(find.text('Locked'), findsOneWidget,
           reason: 'launch gate must engage when a password exists');
       await mark('lockgate');
-      await shot('05_lock_screen');
 
       sw.reset();
       await tester.enterText(find.byType(TextField).first, 'smoke-lock-99');
@@ -147,8 +139,6 @@ void main() {
       print('SMOKE lock: verify+unlock took ${sw.elapsedMilliseconds}ms');
       expect(find.text('START WORK'), findsOneWidget,
           reason: 'correct password must unlock');
-      await mark('unlocked');
-      await shot('06_unlocked_home');
 
       // Engine-delivered pause (labeled: not an OS event) must re-arm the gate.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -163,7 +153,28 @@ void main() {
       await tester.tap(find.text('Unlock'));
       await settle(tester, 5);
       expect(find.text('START WORK'), findsOneWidget);
-      print('SMOKE lock: subtest complete');
+      print('SMOKE lock: engine checks complete');
+
+      // Native window: app sits unlocked on Home with the password
+      // persisted. run_smoke.sh's poller sees this state and runs
+      // lock_relaunch.py CONCURRENTLY (native adb input only). We wait
+      // WITHOUT pumping or touching the engine, so no competing
+      // taps/lifecycle requests. A missing marker is a native-side
+      // failure, reported by lock_relaunch's own exit code - the engine
+      // test does not fail on it.
+      await mark('unlocked');
+      print('SMOKE lock: native window open (engine idle)');
+      final done = File('/data/data/com.example.shop_billing'
+          '/files/native_done.txt');
+      final end = DateTime.now().add(const Duration(seconds: 180));
+      while (DateTime.now().isBefore(end)) {
+        if (done.existsSync()) {
+          print('SMOKE lock: native checks signalled done');
+          return;
+        }
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      print('SMOKE lock: native window elapsed without native_done');
     }
 
     try {

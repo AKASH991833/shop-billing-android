@@ -93,18 +93,12 @@ jobs:
           name: android-smoke-evidence
           path: |
             boot_home.png
-            lock_coldstart.png
             lock_after_home.png
+            lock_after_unlock.png
             logcat_tail.txt
             smoke_run.log
             state_home.png
             state_more.png
             state_lockgate.png
             state_unlocked.png
-            01_home.png
-            02_before_save.png
-            03_after_save.png
-            04_more.png
-            05_lock_screen.png
-            06_unlocked_home.png
           if-no-files-found: ignore

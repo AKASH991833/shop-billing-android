@@ -267,7 +267,7 @@ class _ReportsPageState extends State<ReportsPage> {
               Text('Security deposits held',
                   style:
                       TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              Text('Refunded on safe return',
+              Text('Refundable \u00B7 not counted as income',
                   style: TextStyle(fontSize: 12, color: kSoft)),
             ]),
             Text(money(r['deposits_held'] ?? 0),

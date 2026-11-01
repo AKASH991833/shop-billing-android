@@ -93,7 +93,7 @@ class InvoicePage extends StatelessWidget {
               _band(
                   'RENTAL'
                   '${(bill['return_date'] as String?) != null ? ' \u00B7 return by ${AppDb.disp(bill['return_date'] as String?)}' : ''}'
-                  ' \u00B7 deposit refunded on safe return',
+                  ' \u00B7 security deposit (refundable)',
                   const Color(0xFF8A6508)),
               _table(rental, rentalCols: true),
             ],
@@ -106,10 +106,13 @@ class InvoicePage extends StatelessWidget {
                 child: Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      'Items Total ${money(bill['charges'] as double)}'
-                      '${(bill['deposit'] as double) > 0 ? ' \u00B7 Deposit (refundable) ${money(bill['deposit'] as double)}' : ''}\n'
-                      'To Collect ${money(bill['total_to_pay'] as double)} \u00B7 Paid ${money((bill['paid_charges'] as double) + (bill['deposit_collected'] as double))}'
-                      ' \u00B7 Balance ${money((bill['balance_charges'] as double) + (bill['deposit_outstanding'] as double))}',
+                      // Every figure reconciles arithmetically:
+                      // charges - paid_charges = balance_charges;
+                      // deposit - deposit_collected = deposit_outstanding;
+                      // balance_charges + deposit_outstanding = total outstanding.
+                      // No mixed-base "To Collect" (run 17 review finding).
+                      'Items Total ${money(bill['charges'] as double)} \u00B7 Paid ${money(bill['paid_charges'] as double)} \u00B7 Balance ${money(bill['balance_charges'] as double)}'
+                      '${(bill['deposit'] as double) > 0 ? '\nDeposit (refundable) ${money(bill['deposit'] as double)} \u00B7 Collected ${money(bill['deposit_collected'] as double)} \u00B7 Outstanding ${money(bill['deposit_outstanding'] as double)}\nTotal Outstanding ${money((bill['balance_charges'] as double) + (bill['deposit_outstanding'] as double))}' : ''}',
                       textAlign: TextAlign.right,
                       style: const TextStyle(fontSize: 10, height: 1.6),
                     ))),

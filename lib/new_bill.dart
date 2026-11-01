@@ -230,6 +230,9 @@ class _NewBillPageState extends State<NewBillPage> {
                     style: TextStyle(
                         color: kRed, fontSize: 12, fontWeight: FontWeight.w700))),
         ]),
+        // Breathing room so the always-floating "Item name" label does not
+        // collide with the "Item N" heading above it (run 17 pixel finding).
+        const SizedBox(height: 10),
         Autocomplete<String>(
           optionsBuilder: (v) => v.text.isEmpty
               ? names

@@ -24,6 +24,8 @@ void main() {
   }
 
   testWidgets('create a sale bill through the UI and see it saved', (tester) async {
+    // Real-async zone for the same FakeAsync/FFI reason (see golden test).
+    await tester.runAsync(() async {
     await tester.binding.setSurfaceSize(const Size(412, 892));
     await tester.pumpWidget(const BillingApp());
     await settle(tester);
@@ -90,5 +92,6 @@ void main() {
     expect(find.text('START WORK'), findsOneWidget);
     expect(find.textContaining('RECENT ENTRIES'), findsOneWidget);
     expect(find.textContaining('750'), findsWidgets);
+    });
   });
 }

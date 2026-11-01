@@ -49,6 +49,9 @@ void main() {
   int billId = 0;
 
   testGoldens('all screens render with seeded shop data', (tester) async {
+    // Real-async zone: widget tests otherwise run under FakeAsync, where
+    // sqflite FFI (dart:io) futures never complete and every DB await hangs.
+    await tester.runAsync(() async {
     // Seed: two customers, two bills (one rental with deposit, one sale),
     // one inventory item - enough for every screen to show real content.
     billId = await AppDb.addBill(
@@ -104,5 +107,6 @@ void main() {
         wrapper: wrap, surfaceSize: phone);
     await settleShort(tester);
     await screenMatchesGolden(tester, '05_invoice');
+    });
   });
 }

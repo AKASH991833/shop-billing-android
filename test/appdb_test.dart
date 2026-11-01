@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:shop_billing/data.dart';
@@ -220,5 +221,45 @@ void main() {
     expect(b['balance_charges'], 900.0);
     final rows = await AppDb.listBills();
     expect(rows.firstWhere((r) => r['id'] == id)['balance_charges'], 900.0);
+  });
+
+  test('backup is verified, and restore returns data to the snapshot', () async {
+    final before = await AppDb.listBills();
+    final r = await AppDb.backupNow();
+    expect(r['verified'], isTrue,
+        reason: 'fresh backup must pass integrity + table-count checks');
+    final path = r['path'] as String;
+    expect(await File(path).exists(), isTrue);
+
+    // Mutate, then restore: the new bill must be gone afterwards.
+    await AppDb.addBill(
+        customerName: 'Backup Probe',
+        type: 'SALE',
+        billDate: AppDb.todayIso(),
+        items: const [
+          {'description': 'probe', 'kind': 'SALE', 'qty': 1, 'rate': 10}
+        ],
+        advance: 0);
+    expect((await AppDb.listBills()).length, before.length + 1);
+
+    final rr = await AppDb.restoreBackup(path);
+    expect(rr['verified'], isTrue,
+        reason: 'restored file must pass the same checks against the backup');
+    expect(rr['safety'], isNotNull,
+        reason: 'a pre-restore safety copy must be kept');
+    final after = await AppDb.listBills();
+    expect(after.length, before.length);
+    expect(after.any((b) => (b['customer'] as String).contains('Backup Probe')),
+        isFalse);
+  });
+
+  test('restore refuses a corrupt file without touching live data', () async {
+    final dir = await getDatabasesPath();
+    final bad = p.join(dir, 'corrupt-probe.db');
+    await File(bad).writeAsBytes(const [1, 2, 3, 4, 5]);
+    final before = await AppDb.listBills();
+    expect(() => AppDb.restoreBackup(bad), throwsArgumentError);
+    // Live data untouched: the DB still opens and returns the same rows.
+    expect((await AppDb.listBills()).length, before.length);
   });
 }

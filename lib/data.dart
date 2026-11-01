@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 
@@ -49,6 +50,114 @@ class AppDb {
       await b.commit(noResult: true);
     });
     return _db!;
+  }
+
+  // ---- backup / restore (verified roundtrip, ported from the desktop app) ----
+  static const _tables = [
+    'customers', 'bills', 'bill_items', 'payments', 'deposits', 'inventory',
+    'settings'
+  ];
+
+  /// Timestamped backups live next to the database in app-private storage.
+  static Future<Directory> backupDir() async {
+    final dir = await getDatabasesPath();
+    final b = Directory(p.join(dir, '..', 'backups'));
+    await b.create(recursive: true);
+    return b;
+  }
+
+  static Future<bool> _integrityOk(String path) async {
+    Database? d;
+    try {
+      d = await openDatabase(path, readOnly: true);
+      final r = await d.rawQuery('PRAGMA integrity_check');
+      return r.isNotEmpty && r.first.values.first == 'ok';
+    } catch (_) {
+      return false;
+    } finally {
+      await d?.close();
+    }
+  }
+
+  static Future<Map<String, int>> _tableCounts(String path) async {
+    final d = await openDatabase(path, readOnly: true);
+    try {
+      final out = <String, int>{};
+      for (final t in _tables) {
+        final r = await d.rawQuery('SELECT COUNT(*) AS c FROM $t');
+        out[t] = (r.first['c'] as num).toInt();
+      }
+      return out;
+    } finally {
+      await d.close();
+    }
+  }
+
+  static bool _countsEqual(Map<String, int> a, Map<String, int> b) {
+    for (final t in _tables) {
+      if ((a[t] ?? -1) != (b[t] ?? -2)) return false;
+    }
+    return true;
+  }
+
+  static String _stamp() {
+    final n = DateTime.now().toLocal();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${n.year}${two(n.month)}${two(n.day)}-${two(n.hour)}${two(n.minute)}${two(n.second)}';
+  }
+
+  /// Verified backup: flush any WAL content, copy the DB file, then check
+  /// the COPY's integrity and table counts against the source - a backup
+  /// that fails verification is reported, never silently trusted.
+  static Future<Map<String, Object?>> backupNow() async {
+    final db = await open();
+    try {
+      await db.execute('PRAGMA wal_checkpoint(FULL)');
+    } catch (_) {} // not in WAL mode - nothing to flush
+    final dir = await getDatabasesPath();
+    final src = p.join(dir, 'shop.db');
+    final dest = p.join((await backupDir()).path, 'shop-${_stamp()}.db');
+    await File(src).copy(dest);
+    final verified = await _integrityOk(dest) &&
+        _countsEqual(await _tableCounts(dest), await _tableCounts(src));
+    return {'path': dest, 'verified': verified};
+  }
+
+  /// Restore [srcPath] over the live DB. Refuses a file that fails the
+  /// integrity check BEFORE touching live data; keeps a timestamped
+  /// pre-restore safety copy; verifies the restored file afterwards.
+  static Future<Map<String, Object?>> restoreBackup(String srcPath) async {
+    if (!await _integrityOk(srcPath)) {
+      throw ArgumentError('Backup file failed integrity check - not restoring');
+    }
+    final srcCounts = await _tableCounts(srcPath);
+    final dir = await getDatabasesPath();
+    final dest = p.join(dir, 'shop.db');
+    String? safety;
+    if (await File(dest).exists()) {
+      try {
+        await (await open()).execute('PRAGMA wal_checkpoint(FULL)');
+      } catch (_) {}
+      safety = p.join((await backupDir()).path, 'pre-restore-${_stamp()}.db');
+      await File(dest).copy(safety);
+    }
+    await debugClose();
+    for (final f in [dest, '$dest-wal', '$dest-shm']) {
+      final file = File(f);
+      if (await file.exists()) await file.delete();
+    }
+    await File(srcPath).copy(dest);
+    final verified =
+        await _integrityOk(dest) && _countsEqual(await _tableCounts(dest), srcCounts);
+    if (!verified && safety != null) {
+      for (final f in [dest, '$dest-wal', '$dest-shm']) {
+        final file = File(f);
+        if (await file.exists()) await file.delete();
+      }
+      await File(safety).copy(dest); // roll back to the safety copy
+      await debugClose();
+    }
+    return {'verified': verified, 'safety': safety};
   }
 
   /// Shop contact details + footer motto from Settings, for printing on

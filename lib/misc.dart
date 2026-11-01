@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import 'ui.dart';
 import 'data.dart';
 import 'main.dart';
@@ -331,6 +334,61 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
+  Future<void> _backupNow() async {
+    try {
+      final r = await AppDb.backupNow();
+      if (!mounted) return;
+      final name = p.basename(r['path'] as String);
+      if (r['verified'] == true) {
+        toast(context, 'Backup saved & verified: $name');
+        // Offer the share sheet so the backup can leave the phone (Drive,
+        // WhatsApp, Files). The local copy stays in app storage either way.
+        await SharePlus.instance.share(ShareParams(
+            files: [XFile(r['path'] as String)], text: 'Shop backup $name'));
+      } else {
+        toast(context, 'Backup written but verification FAILED - do not rely on it');
+      }
+    } catch (e) {
+      if (mounted) toast(context, 'Backup failed: $e');
+    }
+  }
+
+  Future<void> _restore() async {
+    final pick = await FilePicker.platform
+        .pickFiles(type: FileType.custom, allowedExtensions: ['db']);
+    final path = pick?.files.single.path;
+    if (path == null || !mounted) return;
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+              title: const Text('Restore this backup?'),
+              content: Text(
+                  '${p.basename(path)}\n\nThis replaces ALL current data on this phone. A safety copy of the current data is kept first.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Restore')),
+              ],
+            ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final r = await AppDb.restoreBackup(path);
+      if (!mounted) return;
+      toast(
+          context,
+          r['verified'] == true
+              ? 'Backup restored & verified. Reopen any screen to see the data.'
+              : 'Restore failed verification - your previous data was kept.');
+    } catch (e) {
+      if (mounted) {
+        toast(context, e.toString().replaceFirst('Invalid argument(s): ', ''));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -381,7 +439,12 @@ class _SettingsPageState extends State<SettingsPage> {
         infoRow(
             const Text('Backup & restore',
                 style: TextStyle(fontWeight: FontWeight.w600)),
-            const Text('Coming soon', style: TextStyle(fontSize: 12, color: kSoft))),
+            Wrap(spacing: 8, children: [
+              TextButton(
+                  onPressed: _backupNow, child: const Text('Back up now')),
+              TextButton(
+                  onPressed: _restore, child: const Text('Restore')),
+            ])),
         infoRow(
             const Text('Sync with desktop software',
                 style: TextStyle(fontWeight: FontWeight.w600)),

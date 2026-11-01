@@ -90,8 +90,10 @@ void main() {
     await launch(tester);
     await tester.tap(find.byIcon(Icons.more_horiz));
     await settle(tester, 3);
+    expect(find.text('Stock & Items'), findsOneWidget,
+        reason: 'More page must show its rows');
+    expect(find.text('Settings'), findsWidgets);
     await shot('04_more');
-    expect(find.byIcon(Icons.more_horiz), findsWidgets);
   });
 
   testWidgets('smoke: app lock gates launch and pause/resume', (tester) async {

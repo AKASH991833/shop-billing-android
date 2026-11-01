@@ -39,8 +39,8 @@ jobs:
                   open(m, "w").write(x)
           PY
       - run: flutter pub get
-      - name: Data-layer tests (deposits, payments, returns, restart persistence)
-        run: flutter test test/appdb_test.dart test/invoice_totals_test.dart test/newbill_totals_test.dart
+      - name: Data-layer tests (deposits, payments, returns, restart persistence, PDF render)
+        run: flutter test test/appdb_test.dart test/invoice_totals_test.dart test/newbill_totals_test.dart test/invoice_pdf_test.dart
       - name: Visual screen renders (Flutter software rasterizer, NOT Android execution)
         continue-on-error: true
         run: timeout 600 flutter test test/golden_screens_test.dart --update-goldens
@@ -57,6 +57,11 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: invoice-sample-pdf
+          path: build/invoice-sample.pdf
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'ui.dart';
 import 'data.dart';
 import 'main.dart';
+import 'invoice_pdf.dart';
 
 /// On-screen A4-style invoice preview in the same maroon/gold style as the
-/// desktop bills. PDF export and printing are deliberately not claimed until
-/// device-verified.
+/// desktop bills. The PDF action shares a real A4 document (system share /
+/// print sheet) built by invoice_pdf.dart.
 class InvoicePage extends StatelessWidget {
   final Map<String, Object?> bill;
   final List<Map<String, Object?>> items;
@@ -28,7 +30,22 @@ class InvoicePage extends StatelessWidget {
     ].where((v) => v.trim().isNotEmpty).join(' \u00B7 ');
     final footerMotto = (shop['motto'] ?? '').trim();
     return Scaffold(
-      appBar: AppBar(title: Text('Invoice ${bill['bill_no']}')),
+      appBar: AppBar(title: Text('Invoice ${bill['bill_no']}'), actions: [
+        IconButton(
+            tooltip: 'Share / print PDF',
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () async {
+              final bytes = await buildInvoicePdf(
+                  bill: bill,
+                  items: items,
+                  shop: shop,
+                  shopName: Brand.value.shopName,
+                  categories: Brand.value.categories,
+                  motto: Brand.value.motto);
+              await Printing.sharePdf(
+                  bytes: bytes, filename: 'Invoice-${bill['bill_no']}.pdf');
+            }),
+      ]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         Container(
           decoration: BoxDecoration(

@@ -77,7 +77,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           ls -l /dev/kvm || true
-      - name: Emulator runtime deps (run 7: qemu missing libpulse.so.0)
+      - name: "Emulator runtime deps (run 7 fix: install qemu libpulse.so.0 dependency)"
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libpulse0 libglu1-mesa
       - name: Emulator smoke test (real Android runtime; bounded, evidence preserved)
         uses: reactivecircus/android-emulator-runner@v2

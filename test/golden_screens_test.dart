@@ -100,6 +100,12 @@ void main() {
     });
 
     final shots = <String, Widget>{
+      // Isolated minimal repro for the run-17/18 More-page tagline blocks:
+      // the SAME brandHeader widget rendered readable on Home but as blocks
+      // on More, with identical ASCII content (DIAG-proven). If this bare
+      // capture is readable while 11_more blocks again, the cause is
+      // context-dependent in the harness renderer, not the app widget.
+      '00_brand_header_bare': brandHeader(),
       '01_shell_home': const Shell(),
       '02_new_bill': const NewBillPage(),
       '03_bills_list': Scaffold(body: BillsPage(onOpenBill: (_) {})),

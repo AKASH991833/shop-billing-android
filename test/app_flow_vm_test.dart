@@ -103,7 +103,7 @@ void main() {
         'canPop=${route?.canPop}');
     final hits = tester.hitTestOnBinding(backRect.center);
     print('CHECKPOINT: hitTest at center -> ' +
-        hits.path().map((e) => e.target.runtimeType.toString()).join(' < '));
+        hits.path.map((e) => e.target.runtimeType.toString()).join(' < '));
     expect(backBtn, findsOneWidget);
     await tester.tap(backBtn); // default warnIfMissed: keep the verbatim warning in the log
     await settle(tester);

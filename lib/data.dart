@@ -95,11 +95,11 @@ class AppDb {
       b.execute(
           "CREATE TABLE inventory(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '', total_qty REAL NOT NULL DEFAULT 0, sale_price REAL, rent_rate_day REAL, active INTEGER NOT NULL DEFAULT 1)");
       b.execute("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)");
-      b.execute("$LEGACY_TABLE");
+      b.execute("CREATE TABLE legacy_records(id INTEGER PRIMARY KEY AUTOINCREMENT, bill_no TEXT UNIQUE NOT NULL, customer TEXT NOT NULL DEFAULT '', mobile TEXT NOT NULL DEFAULT '', type_label TEXT NOT NULL DEFAULT '', bill_date TEXT, return_date TEXT, total REAL NOT NULL, advance REAL NOT NULL, balance REAL NOT NULL, status TEXT NOT NULL DEFAULT '', imported_at TEXT NOT NULL)");
       await b.commit(noResult: true);
     }, onUpgrade: (db, oldV, newV) async {
       if (oldV < 2) {
-        await db.execute("$LEGACY_TABLE");
+        await db.execute("CREATE TABLE legacy_records(id INTEGER PRIMARY KEY AUTOINCREMENT, bill_no TEXT UNIQUE NOT NULL, customer TEXT NOT NULL DEFAULT '', mobile TEXT NOT NULL DEFAULT '', type_label TEXT NOT NULL DEFAULT '', bill_date TEXT, return_date TEXT, total REAL NOT NULL, advance REAL NOT NULL, balance REAL NOT NULL, status TEXT NOT NULL DEFAULT '', imported_at TEXT NOT NULL)");
       }
     });
     return _db!;

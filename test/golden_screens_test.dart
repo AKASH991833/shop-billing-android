@@ -92,7 +92,7 @@ void main() {
       '11_more': const MorePage(),
     };
     for (final e in shots.entries) {
-      await pumpWidgetBuilder(tester, wrap(e.value), surfaceSize: phone);
+      await tester.pumpWidgetBuilder(e.value, wrapper: wrap, surfaceSize: phone);
       await settleShort(tester);
       await screenMatchesGolden(tester, e.key);
     }
@@ -100,8 +100,8 @@ void main() {
     // Invoice needs the seeded bill + items as plain maps.
     final bill = (await AppDb.getBill(billId))!;
     final items = await AppDb.billItems(billId);
-    await pumpWidgetBuilder(tester, wrap(InvoicePage(bill: bill, items: items)),
-        surfaceSize: phone);
+    await tester.pumpWidgetBuilder(InvoicePage(bill: bill, items: items),
+        wrapper: wrap, surfaceSize: phone);
     await settleShort(tester);
     await screenMatchesGolden(tester, '05_invoice');
   });

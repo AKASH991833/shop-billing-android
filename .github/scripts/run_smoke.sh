@@ -6,8 +6,33 @@
 set +e
 cd "$(dirname "$0")/../.."
 
+# Tee EVERYTHING to a file that lands in the evidence artifact - the Actions
+# log delivery dropped this script's own echoes in run 41.
+exec > >(tee smoke_run.log) 2>&1
+
+# State-handshake poller: the smoke suite writes the current app state to
+# /sdcard/shop_billing_state.txt at known screens (home, more, lockgate,
+# unlocked); grab a native adb screencap the moment each state appears, so
+# real Android pixels do not depend on Flutter's screenshot conversion.
+adb shell rm -f /sdcard/shop_billing_state.txt
+LAST_STATE=""
+(
+  while true; do
+    S=$(adb shell cat /sdcard/shop_billing_state.txt 2>/dev/null | tr -d '\r')
+    if [ -n "$S" ] && [ "$S" != "$LAST_STATE" ]; then
+      adb exec-out screencap -p > "state_$S.png" 2>/dev/null
+      echo "state capture: $S -> state_$S.png"
+      LAST_STATE="$S"
+    fi
+    sleep 3
+  done
+) &
+POLLER=$!
+
 timeout 780 flutter test integration_test/smoke_test.dart -r expanded
 ITEST=$?
+
+kill $POLLER 2>/dev/null
 
 # Evidence FIRST, before any later phase can hang or be cut off.
 adb logcat -d -t 400 > logcat_tail.txt
@@ -23,7 +48,8 @@ done
 ls -la *.png 2>/dev/null
 
 # OS-level lock checks on the same device (password persisted by the smoke
-# suite): cold-start gate, native-input unlock, HOME+relaunch.
+# suite): password persistence, cold-start gate, native-input unlock,
+# HOME+relaunch - each with foreground-focus evidence first.
 timeout 240 python3 .github/scripts/lock_relaunch.py
 LOCK=$?
 

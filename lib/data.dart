@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate' show Isolate;
 import 'dart:io';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
@@ -277,7 +278,11 @@ class AppDb {
     final salt = List.generate(16, (_) => r.nextInt(256))
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join();
-    final h = pbkdf2Hex(password, salt, pbkdf2Iterations);
+    // 200k pure-Dart iterations block the calling isolate for seconds
+    // on a slow device - hash off the UI isolate so Settings and the
+        // lock screen stay responsive.
+    final h = await Isolate.run(
+        () => pbkdf2Hex(password, salt, pbkdf2Iterations));
     await setSetting('password_hash', 'v2\$$salt\$$pbkdf2Iterations\$$h');
   }
 
@@ -299,7 +304,7 @@ class AppDb {
     } else {
       return false;
     }
-    final cand = pbkdf2Hex(password, salt, iters);
+    final cand = await Isolate.run(() => pbkdf2Hex(password, salt, iters));
     if (cand.length != hash.length) return false;
     var diff = 0; // constant-time compare
     for (var i = 0; i < cand.length; i++) {

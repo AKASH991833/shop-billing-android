@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -32,6 +35,18 @@ void main() {
     }
   }
 
+  // State handshake for the native side: run_smoke.sh polls this file and
+  // grabs an adb screencap at each known app state, so real Android pixels
+  // exist even when the Flutter tool's screenshot conversion fails.
+  Future<void> mark(String state) async {
+    print('SMOKE_STATE=$state');
+    try {
+      File('/sdcard/shop_billing_state.txt').writeAsStringSync(state);
+    } catch (e) {
+      print('SMOKE state file write failed: $e');
+    }
+  }
+
   Future<void> launch(WidgetTester t) async {
     app.main();
     await settle(t, 10);
@@ -43,6 +58,7 @@ void main() {
   testWidgets('smoke: home renders on the Android runtime', (tester) async {
     await launch(tester);
     expect(find.text('START WORK'), findsOneWidget);
+    await mark('home');
     await shot('01_home');
   });
 
@@ -103,35 +119,58 @@ void main() {
     expect(find.text('Stock & Items'), findsOneWidget,
         reason: 'More page must show its rows');
     expect(find.text('Settings'), findsWidgets);
+    await mark('more');
     await shot('04_more');
   });
 
   testWidgets('smoke: app lock gates launch and pause/resume', (tester) async {
-    await AppDb.setPassword('smoke-lock-99');
-    await launch(tester); // fresh launch WITH a password set
-    expect(find.text('Locked'), findsOneWidget,
-        reason: 'launch gate must engage when a password exists');
-    await shot('05_lock_screen');
+    // Hard per-subtest budget: a hang here must fail fast with evidence
+    // instead of consuming the whole suite window (run 41 lost 11 minutes).
+    Future<void> body() async {
+      final sw = Stopwatch()..start();
+      print('SMOKE lock: setPassword start');
+      await AppDb.setPassword('smoke-lock-99');
+      print('SMOKE lock: setPassword took ${sw.elapsedMilliseconds}ms');
 
-    await tester.enterText(find.byType(TextField).first, 'smoke-lock-99');
-    await tester.tap(find.text('Unlock'));
-    await settle(tester, 5);
-    expect(find.text('START WORK'), findsOneWidget,
-        reason: 'correct password must unlock');
-    await shot('06_unlocked_home');
+      sw.reset();
+      await launch(tester); // fresh launch WITH a password set
+      print('SMOKE lock: relaunch took ${sw.elapsedMilliseconds}ms');
+      expect(find.text('Locked'), findsOneWidget,
+          reason: 'launch gate must engage when a password exists');
+      await mark('lockgate');
+      await shot('05_lock_screen');
 
-    // Engine-delivered pause (labeled: not an OS event) must re-arm the gate.
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    await settle(tester, 2);
-    expect(find.text('Locked'), findsOneWidget,
-        reason: 'pause must re-arm the gate');
+      sw.reset();
+      await tester.enterText(find.byType(TextField).first, 'smoke-lock-99');
+      await tester.tap(find.text('Unlock'));
+      await settle(tester, 5);
+      print('SMOKE lock: verify+unlock took ${sw.elapsedMilliseconds}ms');
+      expect(find.text('START WORK'), findsOneWidget,
+          reason: 'correct password must unlock');
+      await mark('unlocked');
+      await shot('06_unlocked_home');
 
-    // Unlock again and finish unlocked; the OS-level cold-start and
-    // HOME/resume checks run in lock_relaunch.py against this same device
-    // state (password persists in app data).
-    await tester.enterText(find.byType(TextField).first, 'smoke-lock-99');
-    await tester.tap(find.text('Unlock'));
-    await settle(tester, 5);
-    expect(find.text('START WORK'), findsOneWidget);
+      // Engine-delivered pause (labeled: not an OS event) must re-arm the gate.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await settle(tester, 2);
+      expect(find.text('Locked'), findsOneWidget,
+          reason: 'pause must re-arm the gate');
+
+      // Unlock again and finish unlocked; the OS-level cold-start and
+      // HOME/resume checks run in lock_relaunch.py against this same device
+      // state (password persists in app data).
+      await tester.enterText(find.byType(TextField).first, 'smoke-lock-99');
+      await tester.tap(find.text('Unlock'));
+      await settle(tester, 5);
+      expect(find.text('START WORK'), findsOneWidget);
+      print('SMOKE lock: subtest complete');
+    }
+
+    try {
+      await body().timeout(const Duration(minutes: 4));
+    } on TimeoutException {
+      print('SMOKE lock: TIMEOUT - exceeded the 4-minute subtest budget');
+      fail('lock subtest exceeded its 4-minute budget');
+    }
   });
 }

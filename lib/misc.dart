@@ -403,9 +403,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _restore() async {
-    final pick = await FilePicker.pickFiles(
+    final files = await FilePicker.pickFiles(
         type: FileType.custom, allowedExtensions: ['db']);
-    final path = pick?.files.single.path;
+    final path = files?.single.path;
     if (path == null || !mounted) return;
     final confirmed = await showDialog<bool>(
         context: context,

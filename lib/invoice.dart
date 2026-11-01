@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'ui.dart';
 import 'data.dart';
@@ -7,7 +9,32 @@ import 'invoice_pdf.dart';
 
 /// On-screen A4-style invoice preview in the same maroon/gold style as the
 /// desktop bills. The PDF action shares a real A4 document (system share /
-/// print sheet) built by invoice_pdf.dart.
+/// print sheet) built by invoice_pdf.dart with bundled Noto fonts so Hindi
+/// and other Unicode names render truthfully.
+
+Map<String, pw.Font>? _pdfFonts;
+
+/// Bundled Noto Sans (+ Devanagari fallback) for PDF output, loaded once.
+Future<Map<String, pw.Font>> loadPdfFonts() async {
+  final cached = _pdfFonts;
+  if (cached != null) return cached;
+  final fonts = <String, pw.Font>{};
+  try {
+    fonts['regular'] =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Regular.ttf'));
+    fonts['bold'] =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Bold.ttf'));
+    fonts['italic'] =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Italic.ttf'));
+    fonts['devanagari'] = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/NotoSansDevanagari-Regular.ttf'));
+  } catch (_) {
+    // Font assets missing: the PDF builder will refuse non-Latin-1 text
+    // explicitly instead of emitting corrupted output.
+  }
+  _pdfFonts = fonts;
+  return fonts;
+}
 class InvoicePage extends StatelessWidget {
   final Map<String, Object?> bill;
   final List<Map<String, Object?>> items;
@@ -35,13 +62,20 @@ class InvoicePage extends StatelessWidget {
             tooltip: 'Share / print PDF',
             icon: const Icon(Icons.picture_as_pdf_outlined),
             onPressed: () async {
+              final fonts = await loadPdfFonts();
               final bytes = await buildInvoicePdf(
                   bill: bill,
                   items: items,
                   shop: shop,
                   shopName: Brand.value.shopName,
                   categories: Brand.value.categories,
-                  motto: Brand.value.motto);
+                  motto: Brand.value.motto,
+                  fontRegular: fonts['regular'],
+                  fontBold: fonts['bold'],
+                  fontItalic: fonts['italic'],
+                  fontFallback: [
+                    if (fonts['devanagari'] != null) fonts['devanagari']!
+                  ]);
               await Printing.sharePdf(
                   bytes: bytes, filename: 'Invoice-${bill['bill_no']}.pdf');
             }),

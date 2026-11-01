@@ -49,7 +49,28 @@ Future<Uint8List> buildInvoicePdf({
   String shopName = 'Shop',
   String categories = '',
   String motto = '',
+  pw.Font? fontRegular,
+  pw.Font? fontBold,
+  pw.Font? fontItalic,
+  List<pw.Font> fontFallback = const [],
 }) async {
+  // Unicode safety: the built-in PDF fonts are Latin-1 only. If any text
+  // (customer, item, shop name) carries characters beyond Latin-1, a Unicode
+  // TTF fallback (bundled Noto fonts) is REQUIRED - otherwise refuse rather
+  // than silently emit dropped or corrupted glyphs.
+  bool needsUnicode(String s) => s.runes.any((r) => r > 0xFF);
+  final allText = [
+    shopName, categories, motto,
+    ...shop.values,
+    bill['customer'] as String? ?? '',
+    bill['mobile'] as String? ?? '',
+    bill['customer_address'] as String? ?? '',
+    for (final i in items) i['description'] as String? ?? '',
+  ];
+  if (allText.any(needsUnicode) && fontFallback.isEmpty) {
+    throw ArgumentError(
+        'Invoice text contains characters beyond Latin-1 but no Unicode fallback font was provided - refusing to emit a corrupted PDF.');
+  }
   final rental = items.where((i) => i['kind'] == 'RENTAL').toList();
   final flat = items.where((i) => i['kind'] != 'RENTAL').toList();
   final cust = (bill['customer'] as String? ?? '').isEmpty
@@ -134,7 +155,15 @@ Future<Uint8List> buildInvoicePdf({
           ]));
 
   final doc = pw.Document();
+  final theme = fontRegular == null
+      ? null
+      : pw.ThemeData.withFont(
+          base: fontRegular,
+          bold: fontBold ?? fontRegular,
+          italic: fontItalic ?? fontRegular,
+          fontFallback: fontFallback);
   doc.addPage(pw.Page(
+      theme: theme,
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(36),
       build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [

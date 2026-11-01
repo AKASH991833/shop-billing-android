@@ -13,8 +13,16 @@ import 'package:shop_billing/main.dart' as app;
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  Future<void> settle(WidgetTester t, [int secs = 8]) =>
-      t.pumpAndSettle(Duration(seconds: secs));
+  // Bounded real-time pumping. pumpAndSettle never settles while a text
+  // field has focus - the blinking cursor schedules a frame every ~500 ms
+  // forever (the LockScreen autofocus made test 4 hang in run 38).
+  Future<void> settle(WidgetTester t, [int secs = 8]) async {
+    final end = DateTime.now().add(Duration(seconds: secs));
+    while (DateTime.now().isBefore(end)) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await t.pump();
+    }
+  }
 
   Future<void> shot(String name) async {
     try {
@@ -48,9 +56,11 @@ void main() {
         of: find.text('Walk-in customer'), matching: find.byType(TextField));
     expect(nameField, findsOneWidget);
     await tester.tap(nameField.first);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
     await tester.enterText(nameField.first, 'Smoke Customer');
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
 
     await tester.scrollUntilVisible(find.text('Item name'), 120,
         scrollable: find.byType(Scrollable).first);
@@ -61,14 +71,14 @@ void main() {
         of: find.text('Rate'), matching: find.byType(TextField));
     await tester.enterText(rateField.first, '750');
     FocusManager.instance.primaryFocus?.unfocus();
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await settle(tester, 2);
 
     await tester.scrollUntilVisible(find.text('Save Bill'), 250,
         scrollable: find.byType(Scrollable).first);
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await settle(tester, 2);
     await shot('02_before_save');
     await tester.tap(find.text('Save Bill'));
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    await settle(tester, 5);
 
     // Diagnostics BEFORE assertions: distinguish tap dispatch vs validation
     // rejection vs DB write failure.
@@ -112,7 +122,7 @@ void main() {
 
     // Engine-delivered pause (labeled: not an OS event) must re-arm the gate.
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await settle(tester, 2);
     expect(find.text('Locked'), findsOneWidget,
         reason: 'pause must re-arm the gate');
 
